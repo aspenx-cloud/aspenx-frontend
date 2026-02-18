@@ -37,8 +37,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Base path for GitHub Pages — change to / when using a custom domain
-          VITE_BASE_PATH: /aspenx-frontend/
+          # Custom domain aspenx.cloud — base path is /
+          VITE_BASE_PATH: /
           # Firebase — add these as repository secrets in Settings > Secrets > Actions
           VITE_FIREBASE_API_KEY:            ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN:        ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
