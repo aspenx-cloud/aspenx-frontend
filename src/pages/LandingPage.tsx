@@ -223,11 +223,29 @@ function AboutSection() {
 function ContactSection() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Front-end only — no API call in this stub
-    setSubmitted(true);
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch('https://formspree.io/f/mzdakgda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ name: form.name, email: form.email, message: form.message }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        setError('Something went wrong. Please try again or email us directly.');
+      }
+    } catch {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -302,13 +320,18 @@ function ContactSection() {
                   focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all resize-none"
               />
             </div>
+            {error && (
+              <p className="text-sm text-red-400 text-center">{error}</p>
+            )}
             <button
               type="submit"
+              disabled={sending}
               className="w-full py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-600
                 hover:from-cyan-400 hover:to-blue-500 text-white transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900
+                disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Send message
+              {sending ? 'Sending…' : 'Send message'}
             </button>
           </form>
         )}
