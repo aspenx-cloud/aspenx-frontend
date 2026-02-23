@@ -52,10 +52,7 @@ export default function Navbar() {
         >
           <div className="w-8 h-8 relative">
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg opacity-20 group-hover:opacity-40 transition-opacity" />
-            <svg viewBox="0 0 32 32" className="w-8 h-8 relative" fill="none">
-              <path d="M16 4 L28 26 H4 Z" stroke="#06b6d4" strokeWidth="2" strokeLinejoin="round" fill="none" />
-              <path d="M10 20 L16 10 L22 20" stroke="#2563eb" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
-            </svg>
+            <img src="/favicon.svg" alt="AspenX logo" className="w-8 h-8 relative" />
           </div>
           <span className="text-lg font-bold tracking-tight">
             <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Aspen</span>

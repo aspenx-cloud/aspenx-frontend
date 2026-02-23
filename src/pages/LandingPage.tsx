@@ -325,9 +325,7 @@ function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 32 32" className="w-6 h-6" fill="none">
-              <path d="M16 4 L28 26 H4 Z" stroke="#06b6d4" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
+            <img src="/favicon.svg" alt="AspenX logo" className="w-6 h-6" />
             <span className="text-sm font-semibold text-slate-400">AspenX.cloud</span>
           </div>
           <p className="text-xs text-slate-600 text-center max-w-lg">
