@@ -331,11 +331,11 @@ export default function BuilderPage() {
 
       {/* Main layout */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <main className="flex-1 lg:overflow-hidden max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           <div className="lg:grid lg:grid-cols-[300px_1fr_260px] lg:gap-6 h-full">
 
             {/* ── Left: Summary ────────────────────────────────────────── */}
-            <div className={`${mobileTab !== 'summary' ? 'hidden lg:block' : 'block'}`}>
+            <div className={`${mobileTab !== 'summary' ? 'hidden lg:flex' : 'flex'} flex-col lg:h-full`}>
               <SummaryPanel
                 tier={tier}
                 region={region}
@@ -357,12 +357,12 @@ export default function BuilderPage() {
             </div>
 
             {/* ── Center: Drop canvas ──────────────────────────────────── */}
-            <div className={`${mobileTab !== 'canvas' ? 'hidden lg:flex' : 'flex'} flex-col min-h-[400px] lg:min-h-[calc(100vh-260px)]`}>
+            <div className={`${mobileTab !== 'canvas' ? 'hidden lg:flex' : 'flex'} flex-col min-h-[400px] lg:min-h-0 lg:h-full`}>
               <DropCanvas selections={selections} onRemove={removeItem} />
             </div>
 
             {/* ── Right: Draggable topics ──────────────────────────────── */}
-            <div className={`${mobileTab !== 'items' ? 'hidden lg:block' : 'block'} overflow-y-auto max-h-[calc(100vh-260px)] lg:max-h-[calc(100vh-260px)] pr-1`}>
+            <div className={`${mobileTab !== 'items' ? 'hidden lg:block' : 'block'} overflow-y-auto lg:h-full pr-1`}>
               <div className="space-y-1">
                 <p className="text-xs text-slate-600 px-2 mb-3">
                   Drag to canvas or click/tap to add
