@@ -30,14 +30,14 @@ export default function DragCard({ item, isSelected, onAdd, overlay = false }: D
       ref={overlay ? undefined : setNodeRef}
       style={style}
       className={`
-        group relative rounded-xl border p-3 cursor-grab active:cursor-grabbing
-        transition-all duration-200 select-none
+        group relative rounded-xl border px-3 py-2.5 select-none
+        transition-all duration-150
         ${colorClasses}
-        ${isDragging ? 'opacity-40 scale-95' : ''}
-        ${overlay ? 'shadow-2xl shadow-black/60 scale-105 cursor-grabbing' : ''}
+        ${isDragging ? 'opacity-30 scale-95' : ''}
+        ${overlay ? 'shadow-2xl shadow-black/60 scale-105 cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}
         ${isSelected
-          ? 'opacity-60 ring-1 ring-inset ring-current'
-          : 'hover:scale-[1.02] hover:shadow-md hover:shadow-black/30'
+          ? 'bg-opacity-20 ring-1 ring-inset ring-current/40'
+          : 'hover:brightness-110 hover:shadow-sm hover:shadow-black/20'
         }
       `}
       {...(overlay ? {} : listeners)}
@@ -46,40 +46,47 @@ export default function DragCard({ item, isSelected, onAdd, overlay = false }: D
       tabIndex={overlay ? -1 : 0}
       aria-label={`Add ${item.label}${isSelected ? ' (already added)' : ''}`}
       aria-pressed={isSelected}
-      onClick={() => !overlay && onAdd(item)}
+      onClick={() => !overlay && !isSelected && onAdd(item)}
       onKeyDown={(e) => {
-        if (!overlay && (e.key === 'Enter' || e.key === ' ')) {
+        if (!overlay && !isSelected && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onAdd(item);
         }
       }}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white leading-tight">{item.label}</p>
+          <p className={`text-xs font-medium leading-snug transition-colors ${isSelected ? 'text-white/70' : 'text-white'}`}>
+            {item.label}
+          </p>
           {item.description && (
-            <p className="text-xs mt-0.5 opacity-70">{item.description}</p>
+            <p className="text-[10px] mt-0.5 opacity-50 leading-snug">{item.description}</p>
           )}
         </div>
+
         {isSelected ? (
-          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
+          <span className="flex-shrink-0 flex items-center gap-0.5 text-[10px] font-semibold opacity-70">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </span>
         ) : (
-          <svg className="w-4 h-4 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         )}
       </div>
 
-      {/* AWS hints tooltip on hover */}
-      {!overlay && item.awsHints.length > 0 && (
-        <div className="hidden group-hover:block absolute left-full top-0 ml-2 z-10 w-56 p-3 rounded-xl bg-slate-800 border border-slate-700 shadow-xl">
-          <p className="text-xs font-medium text-slate-400 mb-1.5">Usually maps to:</p>
-          <ul className="space-y-1">
+      {/* AWS hints — rendered below the card label on hover, stays within panel bounds */}
+      {!overlay && !isSelected && item.awsHints.length > 0 && (
+        <div className="hidden group-hover:block mt-2 pt-2 border-t border-current/10">
+          <ul className="space-y-0.5">
             {item.awsHints.map((hint, i) => (
-              <li key={i} className="text-xs text-slate-300 flex items-start gap-1.5">
-                <span className="text-cyan-500 mt-0.5">›</span>
+              <li key={i} className="text-[10px] opacity-60 flex items-start gap-1 leading-snug">
+                <span className="opacity-60 mt-px">›</span>
                 {hint}
               </li>
             ))}

@@ -25,6 +25,14 @@ import { useAuth } from '../contexts/AuthContext';
 
 const VALID_TIERS: Tier[] = [1, 2, 3];
 
+const REGION_FLAGS: Record<string, string> = {
+  'us-east-1':      '🇺🇸',
+  'us-west-2':      '🇺🇸',
+  'eu-west-1':      '🇮🇪',
+  'eu-central-1':   '🇩🇪',
+  'ap-southeast-1': '🇸🇬',
+};
+
 type MobileTab = 'items' | 'canvas' | 'summary';
 
 const STEP_LABELS = ['Build recipe', 'Review estimate', 'Checkout'];
@@ -295,7 +303,9 @@ export default function BuilderPage() {
                 hover:border-slate-600 cursor-pointer"
             >
               {REGIONS.map((r) => (
-                <option key={r.value} value={r.value}>{r.label} ({r.value})</option>
+                <option key={r.value} value={r.value}>
+                  {REGION_FLAGS[r.value]} {r.label}
+                </option>
               ))}
             </select>
             <span className="text-[10px] text-slate-600 hidden sm:block">
@@ -364,8 +374,8 @@ export default function BuilderPage() {
             {/* ── Right: Draggable topics ──────────────────────────────── */}
             <div className={`${mobileTab !== 'items' ? 'hidden lg:block' : 'block'} overflow-y-auto lg:h-full pr-1`}>
               <div className="space-y-1">
-                <p className="text-xs text-slate-600 px-2 mb-3">
-                  Drag to canvas or click/tap to add
+                <p className="text-xs text-slate-600 px-2 mb-2 font-medium uppercase tracking-wider">
+                  Pick your building blocks
                 </p>
                 {TOPICS.map((topic) => (
                   <BuilderTopic
