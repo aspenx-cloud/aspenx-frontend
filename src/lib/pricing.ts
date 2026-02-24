@@ -1,20 +1,29 @@
-import type { Tier, RecipeItem, Addon, PriceEstimate, PriceLineItem } from './types';
+import type { Tier, Region, RecipeItem, Addon, PriceEstimate, PriceLineItem } from './types';
 
-// ─── Base Fees ────────────────────────────────────────────────────────────────
-// Tune these constants to adjust pricing.
+// ─── Region multipliers (placeholder — real pricing via backend later) ────────
+// Values relative to us-east-1 baseline (1.0).
+export const REGION_MULTIPLIERS: Record<Region, number> = {
+  'us-east-1':      1.00,
+  'us-west-2':      1.00,
+  'eu-west-1':      1.12,
+  'eu-central-1':   1.15,
+  'ap-southeast-1': 1.20,
+};
+
+// ─── Base AspenX Fees ─────────────────────────────────────────────────────────
 
 export const BASE_FEES: Record<
   Tier,
   { label: string; amount: number; recurring: boolean; startingNote: string }
 > = {
   1: {
-    label: 'Tier 1 — Deploy & Ownership Transfer (base)',
+    label: 'Tier 1 — Deploy into your AWS account (base)',
     amount: 1500,
     recurring: false,
     startingNote: 'Starting at $1,500 (one-time)',
   },
   2: {
-    label: 'Tier 2 — Managed Cloud (base)',
+    label: 'Tier 2 — Managed DevOps (base)',
     amount: 299,
     recurring: true,
     startingNote: 'Starting at $299/mo',
@@ -27,7 +36,7 @@ export const BASE_FEES: Record<
   },
 };
 
-// ─── Per-item add-on fees ─────────────────────────────────────────────────────
+// ─── Per-item AspenX fee add-ons ──────────────────────────────────────────────
 // fees tuple: [Tier1 one-time, Tier2 monthly, Tier3 one-time]
 
 const ITEM_FEES: Record<string, { label: string; fees: [number, number, number] }> = {
@@ -57,7 +66,7 @@ const ITEM_FEES: Record<string, { label: string; fees: [number, number, number] 
   'ops-advanced':      { label: 'Advanced monitoring',   fees: [300,  59,   100] },
 };
 
-// ─── Add-on Fees ──────────────────────────────────────────────────────────────
+// ─── Add-on AspenX Fees ───────────────────────────────────────────────────────
 
 export const ADDON_FEES = {
   cicd: {
@@ -70,15 +79,81 @@ export const ADDON_FEES = {
   },
 };
 
-// ─── Estimate Calculator ──────────────────────────────────────────────────────
+// ─── AWS usage estimate per item (baseline, us-east-1, monthly) ───────────────
+// Rough indicative AWS monthly costs. Real costs vary by usage.
+
+const AWS_ITEM_MONTHLY: Record<string, number> = {
+  'traffic-prototype': 20,
+  'traffic-small':     80,
+  'traffic-medium':    350,
+  'traffic-large':     1200,
+  'style-static':      5,
+  'style-website-api': 100,
+  'style-api-first':   80,
+  'style-realtime':    150,
+  'style-jobs':        60,
+  'data-sql':          150,
+  'data-nosql':        50,
+  'data-files':        30,
+  'data-cache':        80,
+  'data-search':       250,
+  'sec-https':         0,
+  'sec-waf':           50,
+  'sec-private-db':    10,
+  'sec-compliance':    30,
+  'rel-single-az':     0,
+  'rel-multi-az':      100,
+  'rel-backups':       20,
+  'rel-blue-green':    30,
+  'ops-basic':         10,
+  'ops-advanced':      50,
+};
+
+// ─── Complexity score ─────────────────────────────────────────────────────────
+// 0–100. Used to communicate overall environment complexity to customers.
+
+function computeComplexityScore(selections: RecipeItem[]): number {
+  const ITEM_WEIGHTS: Record<string, number> = {
+    'traffic-prototype': 5,
+    'traffic-small':     15,
+    'traffic-medium':    30,
+    'traffic-large':     50,
+    'style-static':      5,
+    'style-website-api': 15,
+    'style-api-first':   12,
+    'style-realtime':    20,
+    'style-jobs':        10,
+    'data-sql':          10,
+    'data-nosql':        8,
+    'data-files':        5,
+    'data-cache':        8,
+    'data-search':       15,
+    'sec-https':         2,
+    'sec-waf':           8,
+    'sec-private-db':    6,
+    'sec-compliance':    12,
+    'rel-single-az':     0,
+    'rel-multi-az':      10,
+    'rel-backups':       5,
+    'rel-blue-green':    8,
+    'ops-basic':         3,
+    'ops-advanced':      8,
+  };
+  const raw = selections.reduce((sum, item) => sum + (ITEM_WEIGHTS[item.id] ?? 5), 0);
+  return Math.min(100, raw);
+}
+
+// ─── Main estimate calculator ─────────────────────────────────────────────────
 
 export function calculateEstimate(
   tier: Tier,
   selections: RecipeItem[],
   addons: Addon,
+  region: Region = 'us-east-1',
 ): PriceEstimate {
+  // ── AspenX fee breakdown ──────────────────────────────────────────────────
   const base = BASE_FEES[tier];
-  const breakdown: PriceLineItem[] = [
+  const aspenxBreakdown: PriceLineItem[] = [
     { label: base.label, amount: base.amount, recurring: base.recurring },
   ];
 
@@ -87,24 +162,35 @@ export function calculateEstimate(
     if (!fee) continue;
     const amount = fee.fees[tier - 1];
     if (amount > 0) {
-      breakdown.push({ label: fee.label, amount, recurring: tier === 2 });
+      aspenxBreakdown.push({ label: fee.label, amount, recurring: tier === 2 });
     }
   }
 
   if (addons.cicd) {
     const cicdFee = ADDON_FEES.cicd[tier];
-    breakdown.push({ label: cicdFee.label, amount: cicdFee.amount, recurring: cicdFee.recurring });
+    aspenxBreakdown.push({ label: cicdFee.label, amount: cicdFee.amount, recurring: cicdFee.recurring });
   }
 
   if (addons.support && tier === 2) {
     const sf = ADDON_FEES.support[2];
-    breakdown.push({ label: sf.label, amount: sf.amount, recurring: sf.recurring });
+    aspenxBreakdown.push({ label: sf.label, amount: sf.amount, recurring: sf.recurring });
   }
 
-  const monthly = breakdown.filter(i => i.recurring).reduce((s, i) => s + i.amount, 0);
-  const oneTime = breakdown.filter(i => !i.recurring).reduce((s, i) => s + i.amount, 0);
+  const aspenxMonthly = aspenxBreakdown.filter((i) => i.recurring).reduce((s, i) => s + i.amount, 0);
+  const aspenxOneTime = aspenxBreakdown.filter((i) => !i.recurring).reduce((s, i) => s + i.amount, 0);
 
-  return { monthly, oneTime, breakdown };
+  // ── AWS usage estimate ────────────────────────────────────────────────────
+  const multiplier = REGION_MULTIPLIERS[region] ?? 1.0;
+  const baseAwsMonthly = selections.reduce((sum, item) => sum + (AWS_ITEM_MONTHLY[item.id] ?? 0), 0);
+  const awsMonthlyEstimate = Math.round(baseAwsMonthly * multiplier);
+
+  return {
+    aspenxMonthly,
+    aspenxOneTime,
+    aspenxBreakdown,
+    awsMonthlyEstimate,
+    complexityScore: computeComplexityScore(selections),
+  };
 }
 
 export function formatUSD(n: number): string {

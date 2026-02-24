@@ -8,6 +8,8 @@ interface TierDef {
   tagline: string;
   bestFor: string;
   model: string;
+  whoOwnsAWS: string;
+  whoPaysAWS: string;
   bullets: string[];
   startingPrice: string;
   priceNote: string;
@@ -19,58 +21,67 @@ interface TierDef {
 const TIERS: TierDef[] = [
   {
     tier: 1,
-    name: 'Deploy & Own',
-    tagline: 'One-time Deploy + Ownership Transfer',
-    bestFor: 'Teams who want to own their infrastructure outright',
+    name: 'Deploy into your AWS account',
+    tagline: 'One-time deployment into your existing AWS account',
+    bestFor: 'Teams who already have an AWS account and want full ownership',
     model: 'One-time payment',
+    whoOwnsAWS: 'You own the AWS account',
+    whoPaysAWS: 'You pay AWS directly',
     accentClass: 'text-blue-400 border-blue-500/30',
     glowClass: 'hover:shadow-[0_0_30px_rgba(59,130,246,0.12)]',
     bullets: [
-      'Build your app recipe with the drag-and-drop builder',
-      'AspenX provisions & deploys into a brand-new AWS account',
-      'Full AWS account ownership transferred to you after delivery',
-      'Detailed handoff documentation included',
+      'You provide an existing AWS account',
+      'Run our bootstrap script to create a deployment IAM role',
+      'AspenX deploys your recipe into your account via cross-account role',
+      'You pay AWS directly — no markup from AspenX',
+      'Full AWS account control stays with you from day one',
       'Optional CI/CD pipeline add-on',
     ],
     startingPrice: '$1,500',
-    priceNote: 'one-time · AWS usage billed separately by Amazon',
+    priceNote: 'one-time AspenX fee · you pay AWS directly for usage',
   },
   {
     tier: 2,
-    name: 'Managed Cloud',
-    tagline: 'Fully Managed Monthly Subscription',
+    name: 'Managed DevOps',
+    tagline: 'Fully managed monthly subscription',
     bestFor: 'Teams who want zero DevOps overhead',
     model: 'Monthly subscription',
+    whoOwnsAWS: 'AspenX provisions & owns the account',
+    whoPaysAWS: 'AspenX pays AWS, invoices you monthly',
     popular: true,
     accentClass: 'text-cyan-400 border-cyan-500/50',
     glowClass: 'shadow-[0_0_40px_rgba(6,182,212,0.15)] hover:shadow-[0_0_50px_rgba(6,182,212,0.25)]',
     bullets: [
-      'Build your app recipe with the drag-and-drop builder',
-      'AspenX provisions & deploys into a new AWS account',
-      'We stay the account owner and manage infra on your behalf',
+      'AspenX provisions a dedicated AWS account under AspenX billing',
+      'You get limited-access IAM roles to view and deploy your app',
+      'AspenX manages all infra, patching, and updates',
+      'AWS costs are included in your monthly subscription',
       'Monthly infrastructure updates & security patches',
       'Optional support & change management add-on',
     ],
     startingPrice: '$299',
-    priceNote: 'per month · AWS usage billed separately by Amazon',
+    priceNote: 'per month · AWS usage included in subscription',
   },
   {
     tier: 3,
     name: 'Terraform Kit',
-    tagline: 'Terraform Files + Deploy Yourself',
-    bestFor: 'Engineering teams who prefer full control',
+    tagline: 'Terraform code + instructions, you deploy',
+    bestFor: 'Engineering teams who prefer full control of their deployment',
     model: 'One-time payment',
+    whoOwnsAWS: 'You own the AWS account',
+    whoPaysAWS: 'You pay AWS directly',
     accentClass: 'text-purple-400 border-purple-500/30',
     glowClass: 'hover:shadow-[0_0_30px_rgba(168,85,247,0.12)]',
     bullets: [
-      'Build your app recipe with the drag-and-drop builder',
-      'Receive production-ready Terraform modules for your setup',
-      'Step-by-step deployment guide for your AWS account',
-      'You deploy, you own, you pay AWS directly',
+      'You provide an existing (or new) AWS account',
+      'AspenX delivers production-ready Terraform modules for your recipe',
+      'Detailed step-by-step deployment guide included',
+      'You run terraform apply — you own the result',
+      'You pay AWS directly — no markup from AspenX',
       'Optional CI/CD pipeline template add-on',
     ],
     startingPrice: '$499',
-    priceNote: 'one-time · you pay AWS directly for usage',
+    priceNote: 'one-time AspenX fee · you pay AWS directly for usage',
   },
 ];
 
@@ -101,9 +112,17 @@ function TierCard({ tier }: TierCardProps) {
         <p className="text-sm text-slate-400">{tier.tagline}</p>
       </div>
 
-      <div className="mb-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+      <div className="mb-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 space-y-1">
         <p className="text-xs text-slate-500 mb-0.5">Best for</p>
         <p className="text-sm text-slate-300">{tier.bestFor}</p>
+        <div className="pt-1.5 flex flex-col gap-0.5">
+          <span className="text-[11px] text-slate-500">
+            <span className="text-slate-400 font-medium">Account ownership:</span> {tier.whoOwnsAWS}
+          </span>
+          <span className="text-[11px] text-slate-500">
+            <span className="text-slate-400 font-medium">AWS billing:</span> {tier.whoPaysAWS}
+          </span>
+        </div>
       </div>
 
       <ul className="flex flex-col gap-2 mb-6 flex-1">
@@ -135,7 +154,7 @@ function TierCard({ tier }: TierCardProps) {
             : 'border border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white hover:bg-slate-800/60 focus:ring-slate-500'
         }`}
       >
-        Select Tier {tier.tier} →
+        Start with Tier {tier.tier} →
       </button>
     </div>
   );

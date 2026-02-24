@@ -1,6 +1,7 @@
 import type { BuilderState } from './types';
 
-const BUILDER_KEY = 'aspenx_builder_v1';
+// Bump version key when shape changes to avoid stale data
+const BUILDER_KEY = 'aspenx_builder_v2';
 const ORDERS_KEY = 'aspenx_orders_v1';
 
 // ─── Builder State ────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ export interface Order {
   id: string;
   tier: number;
   createdAt: string;
-  estimate: { monthly: number; oneTime: number };
+  estimate: { aspenxMonthly: number; aspenxOneTime: number; awsMonthlyEstimate: number };
   selections: string[];
   status: 'pending' | 'processing' | 'complete';
 }

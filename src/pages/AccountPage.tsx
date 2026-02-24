@@ -158,11 +158,11 @@ function OrderCard({ order }: { order: Order }) {
           {order.status}
         </span>
         <div className="text-right">
-          {order.estimate.monthly > 0 && (
-            <p className="text-sm font-bold text-emerald-400">{formatUSD(order.estimate.monthly)}/mo</p>
+          {order.estimate.aspenxMonthly > 0 && (
+            <p className="text-sm font-bold text-emerald-400">{formatUSD(order.estimate.aspenxMonthly)}/mo</p>
           )}
-          {order.estimate.oneTime > 0 && (
-            <p className="text-sm font-bold text-cyan-400">{formatUSD(order.estimate.oneTime)} once</p>
+          {order.estimate.aspenxOneTime > 0 && (
+            <p className="text-sm font-bold text-cyan-400">{formatUSD(order.estimate.aspenxOneTime)} once</p>
           )}
         </div>
       </div>

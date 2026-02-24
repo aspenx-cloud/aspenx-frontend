@@ -78,7 +78,7 @@ function Hero() {
 
         {/* Trust indicators */}
         <div className="mt-16 flex flex-wrap items-center justify-center gap-6 text-slate-600 text-xs">
-          {['No AWS expertise needed', 'Transparent pricing', 'Ownership transfer available', 'Terraform-first'].map((t) => (
+          {['No AWS expertise needed', 'Transparent pricing', 'You own your AWS account (T1 & T3)', 'Terraform-first'].map((t) => (
             <div key={t} className="flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5 text-cyan-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -163,8 +163,8 @@ function AboutSection() {
       icon: (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
       ),
-      title: 'You stay in control',
-      desc: 'Own your AWS account (Tier 1 & 3) or let us manage it (Tier 2). Either way, no vendor lock-in beyond standard AWS.',
+      title: 'Honest billing model',
+      desc: 'Tier 1 & 3: deploy into your own AWS account, you pay AWS directly — no markup. Tier 2: AspenX manages the account and invoices you monthly.',
     },
   ];
 
@@ -188,9 +188,9 @@ function AboutSection() {
                 requiring you to speak AWS fluently.
               </p>
               <p>
-                Whether you want full ownership after delivery, ongoing managed infrastructure,
-                or just the Terraform modules to deploy yourself, we have a tier that fits
-                exactly where your team is today.
+                Whether you want AspenX to deploy directly into your existing AWS account (Tier 1),
+                fully managed infrastructure under AspenX billing (Tier 2), or just the Terraform
+                code to deploy yourself (Tier 3) — we have a delivery model that fits your team today.
               </p>
             </div>
           </div>

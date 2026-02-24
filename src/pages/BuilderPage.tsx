@@ -17,7 +17,9 @@ import SummaryPanel from '../components/SummaryPanel';
 import DragCard from '../components/DragCard';
 import Modal from '../components/Modal';
 import { TOPICS } from '../lib/mappings';
-import type { Tier, RecipeItem, Addon } from '../lib/types';
+import { REGIONS, DEFAULT_REGION } from '../lib/types';
+import type { Tier, Region, RecipeItem, Addon } from '../lib/types';
+import { calculateEstimate } from '../lib/pricing';
 import { loadBuilderState, saveBuilderState, clearBuilderState } from '../lib/storage';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -37,22 +39,39 @@ export default function BuilderPage() {
   const tier: Tier | null = VALID_TIERS.includes(tierParam) ? tierParam : null;
 
   // ── Builder state (persisted to localStorage) ───────────────────────────
+  const [region, setRegion] = useState<Region>(() => {
+    const saved = loadBuilderState();
+    if (saved && saved.tier === tier && saved.region) return saved.region;
+    return DEFAULT_REGION;
+  });
+
   const [selections, setSelections] = useState<RecipeItem[]>(() => {
     const saved = loadBuilderState();
-    // Only restore if tier matches
     if (saved && saved.tier === tier) return saved.selections;
     return [];
   });
+
   const [addons, setAddons] = useState<Addon>(() => {
     const saved = loadBuilderState();
     if (saved && saved.tier === tier) return saved.addons;
     return { cicd: false, support: false };
   });
 
-  // Persist to localStorage whenever selections/addons change
+  // Tier 1 specific state
+  const [awsAccountId, setAwsAccountId] = useState<string>(() => {
+    const saved = loadBuilderState();
+    if (saved && saved.tier === tier) return saved.awsAccountId ?? '';
+    return '';
+  });
+  const [awsConfirmed, setAwsConfirmed] = useState(false);
+
+  // Tier 3 optional field
+  const [existingAccountOptional, setExistingAccountOptional] = useState('');
+
+  // Persist to localStorage whenever relevant state changes
   useEffect(() => {
-    saveBuilderState({ tier, selections, addons });
-  }, [tier, selections, addons]);
+    saveBuilderState({ tier, region, selections, addons, awsAccountId });
+  }, [tier, region, selections, addons, awsAccountId]);
 
   // ── DnD state ────────────────────────────────────────────────────────────
   const [activeItem, setActiveItem] = useState<RecipeItem | null>(null);
@@ -66,11 +85,10 @@ export default function BuilderPage() {
   const addItem = useCallback((item: RecipeItem) => {
     setSelections((prev) => {
       if (item.category === 'traffic') {
-        // Exclusive: replace existing traffic selection
-        if (prev.some((s) => s.id === item.id)) return prev; // already selected, no-op
+        if (prev.some((s) => s.id === item.id)) return prev;
         return [...prev.filter((s) => s.category !== 'traffic'), item];
       }
-      if (prev.some((s) => s.id === item.id)) return prev; // duplicate guard
+      if (prev.some((s) => s.id === item.id)) return prev;
       return [...prev, item];
     });
   }, []);
@@ -119,15 +137,29 @@ export default function BuilderPage() {
     setCheckoutError(null);
 
     try {
+      const estimate = calculateEstimate(tier, selections, addons, region);
+
+      const payload: Record<string, unknown> = {
+        tier,
+        region,
+        selections: selections.map((s) => s.id),
+        addons,
+        aspenxPrice: {
+          monthly: estimate.aspenxMonthly,
+          oneTime: estimate.aspenxOneTime,
+        },
+        awsEstimate: estimate.awsMonthlyEstimate,
+        userEmail: user.email,
+      };
+
+      if (tier === 1) {
+        payload.awsAccountId = awsAccountId;
+      }
+
       const res = await fetch('https://api.aspenx.cloud/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tier,
-          selections: selections.map((s) => s.id),
-          addons,
-          userEmail: user.email,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
@@ -141,7 +173,7 @@ export default function BuilderPage() {
     } finally {
       setCheckoutLoading(false);
     }
-  }, [user, tier, selections, addons]);
+  }, [user, tier, region, selections, addons, awsAccountId]);
 
   // ── Mobile tabs ──────────────────────────────────────────────────────────
   const [mobileTab, setMobileTab] = useState<MobileTab>('items');
@@ -155,19 +187,20 @@ export default function BuilderPage() {
           <h1 className="text-3xl font-bold text-white mb-4">Choose your delivery tier</h1>
           <p className="text-slate-400 mb-10">Select a tier to start building your app recipe.</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {VALID_TIERS.map((t) => (
+            {([
+              { t: 1 as Tier, name: 'Deploy into your AWS account', note: 'One-time payment', sub: 'You own the AWS account' },
+              { t: 2 as Tier, name: 'Managed DevOps',               note: 'Monthly subscription', sub: 'AspenX manages the account' },
+              { t: 3 as Tier, name: 'Terraform Kit',                note: 'One-time payment', sub: 'You deploy, you own' },
+            ]).map(({ t, name, note, sub }) => (
               <button
                 key={t}
                 onClick={() => setSearchParams({ tier: String(t) })}
                 className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-left hover:border-cyan-500/40 transition-all group focus:outline-none focus:ring-2 focus:ring-cyan-500"
               >
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tier {t}</p>
-                <p className="text-lg font-semibold text-white group-hover:text-cyan-400 transition-colors">
-                  {t === 1 ? 'Deploy & Own' : t === 2 ? 'Managed Cloud' : 'Terraform Kit'}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {t === 1 ? 'One-time payment' : t === 2 ? 'Monthly subscription' : 'One-time payment'}
-                </p>
+                <p className="text-lg font-semibold text-white group-hover:text-cyan-400 transition-colors">{name}</p>
+                <p className="text-xs text-slate-500 mt-1">{note}</p>
+                <p className="text-xs text-slate-600 mt-0.5">{sub}</p>
               </button>
             ))}
           </div>
@@ -185,11 +218,17 @@ export default function BuilderPage() {
   const selectedIds = new Set(selections.map((s) => s.id));
   const step = selections.length === 0 ? 1 : checkoutLoading ? 3 : 2;
 
+  const TIER_SHORT: Record<Tier, string> = {
+    1: 'Deploy into your AWS account',
+    2: 'Managed DevOps',
+    3: 'Terraform Kit',
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar />
 
-      {/* Step indicator */}
+      {/* Step indicator + region selector */}
       <div className="pt-16 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-2">
@@ -199,7 +238,7 @@ export default function BuilderPage() {
                 Tier {tier}
               </span>
               <span className="text-xs text-slate-500 hidden sm:block">
-                {tier === 1 ? 'Deploy & Own' : tier === 2 ? 'Managed Cloud' : 'Terraform Kit'}
+                {TIER_SHORT[tier]}
               </span>
             </div>
 
@@ -240,6 +279,30 @@ export default function BuilderPage() {
             </div>
           </div>
         </div>
+
+        {/* Region selector bar */}
+        <div className="border-t border-slate-800/60 bg-slate-950/80">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3">
+            <label htmlFor="region-select" className="text-xs text-slate-500 flex-shrink-0">
+              AWS Region
+            </label>
+            <select
+              id="region-select"
+              value={region}
+              onChange={(e) => setRegion(e.target.value as Region)}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-300
+                focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all
+                hover:border-slate-600 cursor-pointer"
+            >
+              {REGIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label} ({r.value})</option>
+              ))}
+            </select>
+            <span className="text-[10px] text-slate-600 hidden sm:block">
+              Region affects the AWS usage estimate shown below (estimate only — real costs vary).
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Mobile tab bar */}
@@ -269,14 +332,21 @@ export default function BuilderPage() {
       {/* Main layout */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-          <div className="lg:grid lg:grid-cols-[260px_1fr_260px] lg:gap-6 h-full">
+          <div className="lg:grid lg:grid-cols-[300px_1fr_260px] lg:gap-6 h-full">
 
             {/* ── Left: Summary ────────────────────────────────────────── */}
             <div className={`${mobileTab !== 'summary' ? 'hidden lg:block' : 'block'}`}>
               <SummaryPanel
                 tier={tier}
+                region={region}
                 selections={selections}
                 addons={addons}
+                awsAccountId={awsAccountId}
+                onAwsAccountIdChange={setAwsAccountId}
+                awsConfirmed={awsConfirmed}
+                onAwsConfirmedChange={setAwsConfirmed}
+                existingAccountOptional={existingAccountOptional}
+                onExistingAccountOptionalChange={setExistingAccountOptional}
                 onRemoveItem={removeItem}
                 onToggleAddon={toggleAddon}
                 onClear={clearAll}
@@ -287,12 +357,12 @@ export default function BuilderPage() {
             </div>
 
             {/* ── Center: Drop canvas ──────────────────────────────────── */}
-            <div className={`${mobileTab !== 'canvas' ? 'hidden lg:flex' : 'flex'} flex-col min-h-[400px] lg:min-h-[calc(100vh-220px)]`}>
+            <div className={`${mobileTab !== 'canvas' ? 'hidden lg:flex' : 'flex'} flex-col min-h-[400px] lg:min-h-[calc(100vh-260px)]`}>
               <DropCanvas selections={selections} onRemove={removeItem} />
             </div>
 
             {/* ── Right: Draggable topics ──────────────────────────────── */}
-            <div className={`${mobileTab !== 'items' ? 'hidden lg:block' : 'block'} overflow-y-auto max-h-[calc(100vh-220px)] lg:max-h-[calc(100vh-220px)] pr-1`}>
+            <div className={`${mobileTab !== 'items' ? 'hidden lg:block' : 'block'} overflow-y-auto max-h-[calc(100vh-260px)] lg:max-h-[calc(100vh-260px)] pr-1`}>
               <div className="space-y-1">
                 <p className="text-xs text-slate-600 px-2 mb-3">
                   Drag to canvas or click/tap to add
@@ -310,7 +380,7 @@ export default function BuilderPage() {
           </div>
         </main>
 
-        {/* DragOverlay — renders the dragged card as a floating preview */}
+        {/* DragOverlay */}
         <DragOverlay>
           {activeItem && (
             <DragCard
