@@ -233,11 +233,11 @@ export default function BuilderPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen lg:h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar />
 
       {/* Step indicator + region selector */}
-      <div className="pt-16 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-30">
+      <div className="flex-shrink-0 pt-16 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-2">
             {/* Tier badge */}
@@ -316,7 +316,7 @@ export default function BuilderPage() {
       </div>
 
       {/* Mobile tab bar */}
-      <div className="lg:hidden border-b border-slate-800 bg-slate-950">
+      <div className="flex-shrink-0 lg:hidden border-b border-slate-800 bg-slate-950">
         <div className="flex">
           {(['items', 'canvas', 'summary'] as MobileTab[]).map((tab) => (
             <button
@@ -341,8 +341,8 @@ export default function BuilderPage() {
 
       {/* Main layout */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <main className="flex-1 lg:overflow-hidden max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-          <div className="lg:grid lg:grid-cols-[300px_1fr_260px] lg:gap-6 h-full">
+        <main className="flex-1 min-h-0 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          <div className="h-full lg:grid lg:grid-cols-[300px_1fr_260px] lg:grid-rows-1 lg:gap-6">
 
             {/* ── Left: Summary ────────────────────────────────────────── */}
             <div className={`${mobileTab !== 'summary' ? 'hidden lg:flex' : 'flex'} flex-col lg:h-full`}>
