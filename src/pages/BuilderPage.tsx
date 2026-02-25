@@ -19,7 +19,6 @@ import Modal from '../components/Modal';
 import { TOPICS } from '../lib/mappings';
 import { REGIONS, DEFAULT_REGION } from '../lib/types';
 import type { Tier, Region, RecipeItem, Addon } from '../lib/types';
-import { calculateEstimate } from '../lib/pricing';
 import { loadBuilderState, saveBuilderState, clearBuilderState } from '../lib/storage';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -131,57 +130,11 @@ export default function BuilderPage() {
 
   // ── Checkout ─────────────────────────────────────────────────────────────
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const handleCheckout = useCallback(async () => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
+  const handleCheckout = useCallback(() => {
     if (!tier || selections.length === 0) return;
-
-    setCheckoutLoading(true);
-    setCheckoutError(null);
-
-    try {
-      const estimate = calculateEstimate(tier, selections, addons, region);
-
-      const payload: Record<string, unknown> = {
-        tier,
-        region,
-        selections: selections.map((s) => s.id),
-        addons,
-        aspenxPrice: {
-          setupFee:   estimate.aspenx.setupFee,
-          monthlyFee: estimate.aspenx.monthlyFee,
-        },
-        awsEstimate: estimate.awsEstimate.monthly,
-        userEmail: user.email,
-      };
-
-      if (tier === 1) {
-        payload.awsAccountId = awsAccountId;
-      }
-
-      const res = await fetch('https://api.aspenx.cloud/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
-      const { url } = (await res.json()) as { url: string };
-      window.location.href = url;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setCheckoutError(
-        `Unable to start checkout (${msg}). Please try again or contact support@aspenx.cloud.`,
-      );
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }, [user, tier, region, selections, addons, awsAccountId]);
+    navigate('/checkout');
+  }, [tier, selections.length, navigate]);
 
   // ── Mobile tabs ──────────────────────────────────────────────────────────
   const [mobileTab, setMobileTab] = useState<MobileTab>('items');
@@ -224,7 +177,7 @@ export default function BuilderPage() {
   }
 
   const selectedIds = new Set(selections.map((s) => s.id));
-  const step = selections.length === 0 ? 1 : checkoutLoading ? 3 : 2;
+  const step = selections.length === 0 ? 1 : 2;
 
   const TIER_SHORT: Record<Tier, string> = {
     1: 'Deploy into your AWS account',
@@ -361,8 +314,8 @@ export default function BuilderPage() {
                 onToggleAddon={toggleAddon}
                 onClear={clearAll}
                 onCheckout={handleCheckout}
-                checkoutLoading={checkoutLoading}
-                checkoutError={checkoutError}
+                checkoutLoading={false}
+                checkoutError={null}
               />
             </div>
 
