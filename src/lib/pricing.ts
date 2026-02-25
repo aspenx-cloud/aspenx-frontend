@@ -1,149 +1,119 @@
-import type { Tier, Region, RecipeItem, Addon, PriceEstimate, PriceLineItem } from './types';
+import type { Tier, Region, RecipeItem, Addon, PriceEstimate, PriceBreakdownLine } from './types';
 
-// ─── Region multipliers (placeholder — real pricing via backend later) ────────
-// Values relative to us-east-1 baseline (1.0).
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPLEXITY SCORING
+// Each selected item contributes points. Points drive both the AspenX fee and
+// the AWS usage estimate. Easy to tune — just change numbers below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const COMPLEXITY_POINTS: Record<string, number> = {
+  // Traffic & scale (exclusive — only one selected)
+  'traffic-prototype': 1,
+  'traffic-small':     2,
+  'traffic-medium':    4,
+  'traffic-large':     7,
+  // App style
+  'style-static':      1,
+  'style-website-api': 3,
+  'style-api-first':   3,
+  'style-realtime':    4,
+  'style-jobs':        3,
+  // Data needs
+  'data-sql':          4,
+  'data-nosql':        3,
+  'data-files':        2,
+  'data-cache':        2,
+  'data-search':       4,
+  // Security
+  'sec-https':         1,
+  'sec-waf':           2,
+  'sec-private-db':    2,
+  'sec-compliance':    4,
+  // Reliability
+  'rel-single-az':     0,
+  'rel-multi-az':      4,
+  'rel-backups':       2,
+  'rel-blue-green':    3,
+  // Ops
+  'ops-basic':         1,
+  'ops-advanced':      4,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STARTS-FROM TABLE  (minimum floor, no items selected + no addons)
+// Used both in the estimate result and on the landing tier cards.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const STARTS_FROM: Record<Tier, { setupFee: number; monthlyFee: number }> = {
+  1: { setupFee: 499,  monthlyFee: 0   },
+  2: { setupFee: 499,  monthlyFee: 299 },
+  3: { setupFee: 299,  monthlyFee: 0   },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ASPENX FEE FORMULA
+//
+// Tier 1:  setupFee = startsFrom.setupFee + complexityScore × 75
+// Tier 2:  setupFee = startsFrom.setupFee + complexityScore × 60
+//          monthlyFee = startsFrom.monthlyFee + complexityScore × 25
+// Tier 3:  setupFee = startsFrom.setupFee + complexityScore × 45
+//
+// Sanity check (same complexity c):
+//   T1 setup  = 499 + c×75   ≥  T3 setup = 299 + c×45  ✓ (T1 always > T3)
+//   T2 total  = setup + monthly×months — intentionally separate billing
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SETUP_FEE_PER_POINT:   Record<Tier, number> = { 1: 75, 2: 60, 3: 45 };
+const MONTHLY_FEE_PER_POINT: Record<Tier, number> = { 1: 0,  2: 25, 3: 0  };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD-ONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CICD_ADDON_SETUP    = 250; // one-time, all tiers
+const SUPPORT_ADDON_MONTHLY = 200; // monthly, Tier 2 only
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AWS USAGE ESTIMATE (Phase 1 placeholder model)
+//
+// awsMonthly = (AWS_BASE + complexityScore × AWS_PER_POINT + featureAdds) × regionMultiplier
+//
+// NOTE: These are conservative placeholders. Real AWS pricing will be
+// integrated later using AWS Pricing APIs. For now we use a linear model
+// that errs on the low side to avoid over-promising.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AWS_BASE      = 25;   // minimum baseline (DNS, basic infra, etc.)
+const AWS_PER_POINT = 18;   // cost added per complexity point
+
+/** Explicit per-feature AWS cost bumps (on top of complexity×perPoint) */
+const AWS_FEATURE_ADDS: Record<string, number> = {
+  'data-sql':       40,  // RDS instance
+  'data-search':    30,  // OpenSearch cluster
+  'style-realtime': 20,  // WebSocket API + connection mgmt
+  'rel-multi-az':   35,  // cross-AZ data transfer + standby instance
+  'sec-waf':        10,  // WAF rules evaluation cost
+  'data-files':     10,  // S3 storage + requests baseline
+  'ops-advanced':   20,  // X-Ray + enhanced CloudWatch metrics
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGION MULTIPLIERS (placeholder)
+// Relative to us-east-1 = 1.00 baseline.
+// Real regional pricing will come from AWS Pricing APIs in a future release.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const REGION_MULTIPLIERS: Record<Region, number> = {
   'us-east-1':      1.00,
-  'us-west-2':      1.00,
+  'us-west-2':      1.05,
   'eu-west-1':      1.12,
   'eu-central-1':   1.15,
-  'ap-southeast-1': 1.20,
+  'ap-southeast-1': 1.18,
 };
 
-// ─── Base AspenX Fees ─────────────────────────────────────────────────────────
-
-export const BASE_FEES: Record<
-  Tier,
-  { label: string; amount: number; recurring: boolean; startingNote: string }
-> = {
-  1: {
-    label: 'Tier 1 — Deploy into your AWS account (base)',
-    amount: 1500,
-    recurring: false,
-    startingNote: 'Starting at $1,500 (one-time)',
-  },
-  2: {
-    label: 'Tier 2 — Managed DevOps (base)',
-    amount: 299,
-    recurring: true,
-    startingNote: 'Starting at $299/mo',
-  },
-  3: {
-    label: 'Tier 3 — Terraform Kit (base)',
-    amount: 499,
-    recurring: false,
-    startingNote: 'Starting at $499 (one-time)',
-  },
-};
-
-// ─── Per-item AspenX fee add-ons ──────────────────────────────────────────────
-// fees tuple: [Tier1 one-time, Tier2 monthly, Tier3 one-time]
-
-const ITEM_FEES: Record<string, { label: string; fees: [number, number, number] }> = {
-  'traffic-prototype': { label: 'Prototype scale',       fees: [0,    0,    0]   },
-  'traffic-small':     { label: 'Small scale infra',     fees: [250,  49,   75]  },
-  'traffic-medium':    { label: 'Medium scale infra',    fees: [750,  149,  200] },
-  'traffic-large':     { label: 'Large scale infra',     fees: [1500, 299,  350] },
-  'style-static':      { label: 'Static site setup',     fees: [0,    0,    0]   },
-  'style-website-api': { label: 'Website + API setup',   fees: [300,  59,   100] },
-  'style-api-first':   { label: 'API backend setup',     fees: [200,  39,   75]  },
-  'style-realtime':    { label: 'Realtime/WS setup',     fees: [500,  99,   150] },
-  'style-jobs':        { label: 'Background jobs',       fees: [250,  49,   75]  },
-  'data-sql':          { label: 'SQL database',          fees: [300,  59,   100] },
-  'data-nosql':        { label: 'NoSQL database',        fees: [150,  29,   50]  },
-  'data-files':        { label: 'File storage (S3)',     fees: [100,  19,   35]  },
-  'data-cache':        { label: 'Caching layer',         fees: [200,  39,   75]  },
-  'data-search':       { label: 'Full-text search',      fees: [350,  69,   100] },
-  'sec-https':         { label: 'HTTPS / TLS',           fees: [0,    0,    0]   },
-  'sec-waf':           { label: 'WAF protection',        fees: [200,  49,   75]  },
-  'sec-private-db':    { label: 'Private DB networking', fees: [150,  29,   50]  },
-  'sec-compliance':    { label: 'Compliance setup',      fees: [400,  79,   125] },
-  'rel-single-az':     { label: 'Single-AZ config',     fees: [0,    0,    0]   },
-  'rel-multi-az':      { label: 'Multi-AZ HA setup',    fees: [400,  79,   125] },
-  'rel-backups':       { label: 'Backup & PITR config',  fees: [100,  19,   35]  },
-  'rel-blue-green':    { label: 'Blue/green deploy',     fees: [250,  49,   75]  },
-  'ops-basic':         { label: 'Basic monitoring',      fees: [0,    0,    0]   },
-  'ops-advanced':      { label: 'Advanced monitoring',   fees: [300,  59,   100] },
-};
-
-// ─── Add-on AspenX Fees ───────────────────────────────────────────────────────
-
-export const ADDON_FEES = {
-  cicd: {
-    1: { amount: 500, recurring: false, label: 'CI/CD pipeline setup (one-time)' },
-    2: { amount: 500, recurring: false, label: 'CI/CD setup fee (one-time)' },
-    3: { amount: 299, recurring: false, label: 'CI/CD pipeline template (one-time)' },
-  } as Record<Tier, { amount: number; recurring: boolean; label: string }>,
-  support: {
-    2: { amount: 199, recurring: true, label: 'Support & infra changes (monthly)' },
-  },
-};
-
-// ─── AWS usage estimate per item (baseline, us-east-1, monthly) ───────────────
-// Rough indicative AWS monthly costs. Real costs vary by usage.
-
-const AWS_ITEM_MONTHLY: Record<string, number> = {
-  'traffic-prototype': 20,
-  'traffic-small':     80,
-  'traffic-medium':    350,
-  'traffic-large':     1200,
-  'style-static':      5,
-  'style-website-api': 100,
-  'style-api-first':   80,
-  'style-realtime':    150,
-  'style-jobs':        60,
-  'data-sql':          150,
-  'data-nosql':        50,
-  'data-files':        30,
-  'data-cache':        80,
-  'data-search':       250,
-  'sec-https':         0,
-  'sec-waf':           50,
-  'sec-private-db':    10,
-  'sec-compliance':    30,
-  'rel-single-az':     0,
-  'rel-multi-az':      100,
-  'rel-backups':       20,
-  'rel-blue-green':    30,
-  'ops-basic':         10,
-  'ops-advanced':      50,
-};
-
-// ─── Complexity score ─────────────────────────────────────────────────────────
-// 0–100. Used to communicate overall environment complexity to customers.
-
-function computeComplexityScore(selections: RecipeItem[]): number {
-  const ITEM_WEIGHTS: Record<string, number> = {
-    'traffic-prototype': 5,
-    'traffic-small':     15,
-    'traffic-medium':    30,
-    'traffic-large':     50,
-    'style-static':      5,
-    'style-website-api': 15,
-    'style-api-first':   12,
-    'style-realtime':    20,
-    'style-jobs':        10,
-    'data-sql':          10,
-    'data-nosql':        8,
-    'data-files':        5,
-    'data-cache':        8,
-    'data-search':       15,
-    'sec-https':         2,
-    'sec-waf':           8,
-    'sec-private-db':    6,
-    'sec-compliance':    12,
-    'rel-single-az':     0,
-    'rel-multi-az':      10,
-    'rel-backups':       5,
-    'rel-blue-green':    8,
-    'ops-basic':         3,
-    'ops-advanced':      8,
-  };
-  const raw = selections.reduce((sum, item) => sum + (ITEM_WEIGHTS[item.id] ?? 5), 0);
-  return Math.min(100, raw);
-}
-
-// ─── Main estimate calculator ─────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN CALCULATOR
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function calculateEstimate(
   tier: Tier,
@@ -151,48 +121,83 @@ export function calculateEstimate(
   addons: Addon,
   region: Region = 'us-east-1',
 ): PriceEstimate {
-  // ── AspenX fee breakdown ──────────────────────────────────────────────────
-  const base = BASE_FEES[tier];
-  const aspenxBreakdown: PriceLineItem[] = [
-    { label: base.label, amount: base.amount, recurring: base.recurring },
+  // ── 1. Complexity score ───────────────────────────────────────────────────
+  const complexityScore = selections.reduce(
+    (sum, item) => sum + (COMPLEXITY_POINTS[item.id] ?? 0),
+    0,
+  );
+
+  // ── 2. AspenX setup fee ───────────────────────────────────────────────────
+  const base      = STARTS_FROM[tier];
+  const setupBase = base.setupFee + complexityScore * SETUP_FEE_PER_POINT[tier];
+  const monthlyBase = base.monthlyFee + complexityScore * MONTHLY_FEE_PER_POINT[tier];
+
+  const breakdown: PriceBreakdownLine[] = [
+    { label: 'Base setup fee',                           amount: base.setupFee,      isSetup: true  },
+    ...(complexityScore > 0 ? [{
+      label: `Complexity (${complexityScore} pts × $${SETUP_FEE_PER_POINT[tier]})`,
+      amount: complexityScore * SETUP_FEE_PER_POINT[tier],
+      isSetup: true,
+    }] : []),
   ];
 
-  for (const item of selections) {
-    const fee = ITEM_FEES[item.id];
-    if (!fee) continue;
-    const amount = fee.fees[tier - 1];
-    if (amount > 0) {
-      aspenxBreakdown.push({ label: fee.label, amount, recurring: tier === 2 });
+  if (tier === 2) {
+    breakdown.push({ label: 'Base management fee',  amount: base.monthlyFee, isSetup: false });
+    if (complexityScore > 0) {
+      breakdown.push({
+        label: `Complexity management (${complexityScore} pts × $${MONTHLY_FEE_PER_POINT[2]})`,
+        amount: complexityScore * MONTHLY_FEE_PER_POINT[2],
+        isSetup: false,
+      });
     }
   }
 
+  // ── 3. Add-ons ────────────────────────────────────────────────────────────
+  let setupFee   = setupBase;
+  let monthlyFee = monthlyBase;
+
   if (addons.cicd) {
-    const cicdFee = ADDON_FEES.cicd[tier];
-    aspenxBreakdown.push({ label: cicdFee.label, amount: cicdFee.amount, recurring: cicdFee.recurring });
+    setupFee += CICD_ADDON_SETUP;
+    breakdown.push({ label: 'CI/CD pipeline add-on', amount: CICD_ADDON_SETUP, isSetup: true });
   }
 
   if (addons.support && tier === 2) {
-    const sf = ADDON_FEES.support[2];
-    aspenxBreakdown.push({ label: sf.label, amount: sf.amount, recurring: sf.recurring });
+    monthlyFee += SUPPORT_ADDON_MONTHLY;
+    breakdown.push({ label: 'Support & infra changes', amount: SUPPORT_ADDON_MONTHLY, isSetup: false });
   }
 
-  const aspenxMonthly = aspenxBreakdown.filter((i) => i.recurring).reduce((s, i) => s + i.amount, 0);
-  const aspenxOneTime = aspenxBreakdown.filter((i) => !i.recurring).reduce((s, i) => s + i.amount, 0);
-
-  // ── AWS usage estimate ────────────────────────────────────────────────────
-  const multiplier = REGION_MULTIPLIERS[region] ?? 1.0;
-  const baseAwsMonthly = selections.reduce((sum, item) => sum + (AWS_ITEM_MONTHLY[item.id] ?? 0), 0);
-  const awsMonthlyEstimate = Math.round(baseAwsMonthly * multiplier);
+  // ── 4. AWS usage estimate ─────────────────────────────────────────────────
+  const featureAdds = selections.reduce(
+    (sum, item) => sum + (AWS_FEATURE_ADDS[item.id] ?? 0),
+    0,
+  );
+  const multiplier   = REGION_MULTIPLIERS[region] ?? 1.0;
+  const awsMonthly   = Math.round(
+    (AWS_BASE + complexityScore * AWS_PER_POINT + featureAdds) * multiplier,
+  );
 
   return {
-    aspenxMonthly,
-    aspenxOneTime,
-    aspenxBreakdown,
-    awsMonthlyEstimate,
-    complexityScore: computeComplexityScore(selections),
+    aspenx: {
+      setupFee:   Math.round(setupFee),
+      monthlyFee: Math.round(monthlyFee),
+    },
+    awsEstimate: {
+      monthly: awsMonthly,
+    },
+    complexityScore,
+    breakdown,
+    startsFrom: base,
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function formatUSD(n: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(n);
 }

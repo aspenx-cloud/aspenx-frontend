@@ -55,21 +55,33 @@ export interface BuilderState {
   awsAccountId: string;
 }
 
-export interface PriceLineItem {
+/** A single line in the AspenX fee breakdown */
+export interface PriceBreakdownLine {
   label: string;
   amount: number;
-  recurring: boolean;
+  /** true = one-time/setup charge; false = recurring monthly charge */
+  isSetup: boolean;
 }
 
 export interface PriceEstimate {
-  /** AspenX fee — monthly portion (Tier 2 base + support) */
-  aspenxMonthly: number;
-  /** AspenX fee — one-time portion */
-  aspenxOneTime: number;
-  /** Itemised AspenX fee lines */
-  aspenxBreakdown: PriceLineItem[];
-  /** Estimated AWS monthly usage (region-adjusted, estimate only) */
-  awsMonthlyEstimate: number;
-  /** Simple complexity score (0–100) derived from number/type of items */
+  /** What the customer pays AspenX */
+  aspenx: {
+    /** One-time setup/deployment fee (all tiers) */
+    setupFee: number;
+    /** Monthly management fee — always 0 for Tier 1 and Tier 3 */
+    monthlyFee: number;
+  };
+  /** Estimated AWS monthly spend (region-adjusted). Billed separately by Amazon. */
+  awsEstimate: {
+    monthly: number;
+  };
+  /** Raw complexity point total derived from selected items */
   complexityScore: number;
+  /** Itemised breakdown of AspenX fees */
+  breakdown: PriceBreakdownLine[];
+  /** Floor prices shown on tier cards ("Starts from") */
+  startsFrom: {
+    setupFee: number;
+    monthlyFee: number; // 0 for Tier 1 and 3
+  };
 }

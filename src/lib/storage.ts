@@ -38,7 +38,7 @@ export interface Order {
   id: string;
   tier: number;
   createdAt: string;
-  estimate: { aspenxMonthly: number; aspenxOneTime: number; awsMonthlyEstimate: number };
+  estimate: { setupFee: number; monthlyFee: number; awsMonthly: number };
   selections: string[];
   status: 'pending' | 'processing' | 'complete';
 }

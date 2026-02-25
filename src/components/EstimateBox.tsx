@@ -10,22 +10,24 @@ interface EstimateBoxProps {
 export default function EstimateBox({ tier, estimate }: EstimateBoxProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const hasAspenxMonthly = estimate.aspenxMonthly > 0;
-  const hasAspenxOneTime = estimate.aspenxOneTime > 0;
-  const hasAwsEstimate = estimate.awsMonthlyEstimate > 0;
-  const hasAnyPrice = hasAspenxMonthly || hasAspenxOneTime;
+  const { setupFee, monthlyFee } = estimate.aspenx;
+  const awsMonthly = estimate.awsEstimate.monthly;
+  const { complexityScore, breakdown } = estimate;
 
-  const complexityScore = estimate.complexityScore;
+  const hasAnyPrice = setupFee > 0 || monthlyFee > 0;
+
   const complexityLabel =
-    complexityScore >= 60 ? 'High' :
-    complexityScore >= 30 ? 'Medium' : 'Low';
+    complexityScore >= 25 ? 'High' :
+    complexityScore >= 10 ? 'Medium' : 'Low';
   const complexityColor =
-    complexityScore >= 60 ? 'bg-red-500' :
-    complexityScore >= 30 ? 'bg-amber-500' : 'bg-emerald-500';
+    complexityScore >= 25 ? 'bg-red-500' :
+    complexityScore >= 10 ? 'bg-amber-500' : 'bg-emerald-500';
+  // Scale bar: ~50 pts = full width
+  const barWidth = Math.max(complexityScore > 0 ? 4 : 0, Math.min(100, complexityScore * 2));
 
   return (
     <div className="rounded-xl border border-slate-700/80 bg-slate-900 overflow-hidden">
-      {/* AspenX fee — primary */}
+      {/* AspenX fees — primary */}
       <div className="px-4 py-3">
         <div className="flex items-center justify-between mb-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
@@ -43,21 +45,21 @@ export default function EstimateBox({ tier, estimate }: EstimateBoxProps) {
         </div>
 
         {hasAnyPrice ? (
-          <div className="flex items-end gap-4">
-            {hasAspenxMonthly && (
-              <div>
-                <p className="text-3xl font-bold text-emerald-400 leading-none tabular-nums">
-                  {formatUSD(estimate.aspenxMonthly)}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">/ month</p>
-              </div>
-            )}
-            {hasAspenxOneTime && (
+          <div className="flex items-end gap-4 flex-wrap">
+            {setupFee > 0 && (
               <div>
                 <p className="text-3xl font-bold text-cyan-400 leading-none tabular-nums">
-                  {formatUSD(estimate.aspenxOneTime)}
+                  {formatUSD(setupFee)}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">one-time</p>
+                <p className="text-xs text-slate-500 mt-1">one-time setup</p>
+              </div>
+            )}
+            {monthlyFee > 0 && (
+              <div>
+                <p className="text-3xl font-bold text-emerald-400 leading-none tabular-nums">
+                  {formatUSD(monthlyFee)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">/ month management</p>
               </div>
             )}
           </div>
@@ -67,15 +69,15 @@ export default function EstimateBox({ tier, estimate }: EstimateBoxProps) {
       </div>
 
       {/* Breakdown */}
-      {expanded && estimate.aspenxBreakdown.length > 0 && (
+      {expanded && breakdown.length > 0 && (
         <div className="border-t border-slate-800 px-4 py-3 space-y-1.5 animate-fade-in">
-          {estimate.aspenxBreakdown.map((item, i) => (
+          {breakdown.map((item, i) => (
             <div key={i} className="flex items-baseline justify-between gap-2 text-xs">
               <span className="text-slate-500 flex-1 min-w-0 truncate">{item.label}</span>
               <span className="font-medium text-slate-300 flex-shrink-0 tabular-nums">
                 {formatUSD(item.amount)}
                 <span className="text-slate-600 font-normal text-[10px] ml-0.5">
-                  {item.recurring ? '/mo' : ' once'}
+                  {item.isSetup ? ' once' : '/mo'}
                 </span>
               </span>
             </div>
@@ -87,12 +89,14 @@ export default function EstimateBox({ tier, estimate }: EstimateBoxProps) {
       {complexityScore > 0 && (
         <div className="border-t border-slate-800 px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
-            Est. AWS usage{tier === 2 ? ' (included)' : ' (you pay Amazon)'}
+            {tier === 2
+              ? 'Est. AWS usage (invoiced to you at cost)'
+              : 'Est. AWS usage (you pay Amazon directly)'}
           </p>
 
           <div className="flex items-center justify-between gap-3 mb-2">
             <p className="text-lg font-bold text-slate-400 tabular-nums">
-              {hasAwsEstimate ? `~${formatUSD(estimate.awsMonthlyEstimate)}/mo` : '—'}
+              {awsMonthly > 0 ? `~${formatUSD(awsMonthly)}/mo` : '—'}
             </p>
             <div className="text-right">
               <p className="text-[10px] text-slate-500 mb-0.5">Complexity</p>
@@ -104,7 +108,7 @@ export default function EstimateBox({ tier, estimate }: EstimateBoxProps) {
           <div className="w-full h-1 rounded-full bg-slate-800 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${complexityColor}`}
-              style={{ width: `${Math.max(4, complexityScore)}%` }}
+              style={{ width: `${barWidth}%` }}
             />
           </div>
 

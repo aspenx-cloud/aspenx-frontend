@@ -153,10 +153,10 @@ export default function BuilderPage() {
         selections: selections.map((s) => s.id),
         addons,
         aspenxPrice: {
-          monthly: estimate.aspenxMonthly,
-          oneTime: estimate.aspenxOneTime,
+          setupFee:   estimate.aspenx.setupFee,
+          monthlyFee: estimate.aspenx.monthlyFee,
         },
-        awsEstimate: estimate.awsMonthlyEstimate,
+        awsEstimate: estimate.awsEstimate.monthly,
         userEmail: user.email,
       };
 

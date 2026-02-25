@@ -37,8 +37,8 @@ const TIERS: TierDef[] = [
       'Full AWS account control stays with you from day one',
       'Optional CI/CD pipeline add-on',
     ],
-    startingPrice: '$1,500',
-    priceNote: 'one-time AspenX fee · you pay AWS directly for usage',
+    startingPrice: 'From $499',
+    priceNote: 'one-time AspenX fee · price increases with complexity · you pay AWS directly',
   },
   {
     tier: 2,
@@ -55,12 +55,12 @@ const TIERS: TierDef[] = [
       'AspenX provisions a dedicated AWS account under AspenX billing',
       'You get limited-access IAM roles to view and deploy your app',
       'AspenX manages all infra, patching, and updates',
-      'AWS costs are included in your monthly subscription',
+      'AWS billed at cost and invoiced to you separately each month',
       'Monthly infrastructure updates & security patches',
       'Optional support & change management add-on',
     ],
-    startingPrice: '$299',
-    priceNote: 'per month · AWS usage included in subscription',
+    startingPrice: 'From $499 + $299/mo',
+    priceNote: 'one-time setup + monthly management · AWS billed at cost separately',
   },
   {
     tier: 3,
@@ -80,8 +80,8 @@ const TIERS: TierDef[] = [
       'You pay AWS directly — no markup from AspenX',
       'Optional CI/CD pipeline template add-on',
     ],
-    startingPrice: '$499',
-    priceNote: 'one-time AspenX fee · you pay AWS directly for usage',
+    startingPrice: 'From $299',
+    priceNote: 'one-time AspenX fee · price increases with complexity · you pay AWS directly',
   },
 ];
 
