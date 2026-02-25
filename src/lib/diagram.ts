@@ -1,40 +1,80 @@
 import type { Node, Edge } from 'reactflow';
 import type { Tier, RecipeItem, Addon, Region } from './types';
+import { buildDeploymentPlan, type PlanComponent } from './plan';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared layout constants
+// Layout constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const COL_INTERNET = 60;
-const COL_EDGE     = 260;
-const COL_COMPUTE  = 520;
-const COL_DATA     = 760;
+const NODE_W = 152;
+const NODE_H = 56;
+const GAP     = 16;
 
-const ROW_TOP      = 60;
-const ROW_MID      = 200;
-const ROW_BOT      = 340;
-const ROW_EXTRA    = 480;
+// X columns
+const X_EXT_L   = 20;    // external-left nodes (Internet, CDN, WAF, DNS)
+const X_VPC     = 210;   // VPC box left edge
+const X_PUBLIC  = 230;   // public subnet nodes
+const X_APP     = 430;   // private-app subnet nodes
+const X_DATA    = 630;   // private-data subnet nodes
+const X_EXT_R   = 830;   // external-right nodes (monitoring, audit, cicd)
 
-const NODE_W = 160;
-const NODE_H = 64;
+// Y rows
+const Y_TOP        = 30;
+const Y_VPC_TOP    = 20;
+const SUBNET_PAD_V = 12;   // vertical padding inside subnet box
+const SUBNET_GAP   = 12;   // gap between subnet rows
+
+// Subnet row heights (enough for nodes + padding)
+const ROW_H = NODE_H + SUBNET_PAD_V * 2;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Node/edge style helpers
+// Edge style variants
+// ─────────────────────────────────────────────────────────────────────────────
+
+type EdgeVariant = 'solid' | 'dashed' | 'dotted';
+
+function mkEdge(
+  id: string,
+  source: string,
+  target: string,
+  opts: { label?: string; variant?: EdgeVariant; animated?: boolean } = {},
+): Edge {
+  const variant = opts.variant ?? 'solid';
+  const strokeDasharray =
+    variant === 'dashed' ? '6 3' :
+    variant === 'dotted' ? '2 3' : undefined;
+  return {
+    id,
+    source,
+    target,
+    label: opts.label,
+    animated: opts.animated ?? false,
+    type: 'smoothstep',
+    style: {
+      stroke: variant === 'dotted' ? '#374151' : variant === 'dashed' ? '#4c1d95' : '#334155',
+      strokeWidth: 1.5,
+      strokeDasharray,
+    },
+    labelStyle: { fill: '#64748b', fontSize: 10 },
+    labelBgStyle: { fill: '#020817', fillOpacity: 0.85 },
+    labelBgPadding: [3, 4] as [number, number],
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Node factories
 // ─────────────────────────────────────────────────────────────────────────────
 
 function serviceNode(
-  id: string,
-  label: string,
-  sub: string,
+  comp: PlanComponent,
   x: number,
   y: number,
-  accent: 'cyan' | 'blue' | 'purple' | 'amber' | 'emerald' | 'slate' | 'rose',
 ): Node {
   return {
-    id,
+    id: comp.id,
     type: 'serviceNode',
     position: { x, y },
-    data: { label, sub, accent },
+    data: { label: comp.name, sub: comp.sub, accent: comp.accent },
     style: { width: NODE_W, height: NODE_H },
   };
 }
@@ -46,36 +86,18 @@ function groupNode(
   y: number,
   w: number,
   h: number,
-  accent: 'cyan' | 'blue' | 'purple' | 'amber' | 'emerald' | 'slate',
+  accent: string,
+  zIndex = -1,
 ): Node {
   return {
     id,
     type: 'groupNode',
     position: { x, y },
     data: { label, accent },
-    style: { width: w, height: h },
+    style: { width: w, height: h, zIndex },
+    zIndex,
     draggable: false,
     selectable: false,
-  };
-}
-
-function edge(
-  id: string,
-  source: string,
-  target: string,
-  label?: string,
-  animated = false,
-): Edge {
-  return {
-    id,
-    source,
-    target,
-    label,
-    animated,
-    type: 'smoothstep',
-    style: { stroke: '#334155', strokeWidth: 1.5 },
-    labelStyle: { fill: '#64748b', fontSize: 10 },
-    labelBgStyle: { fill: '#0f172a' },
   };
 }
 
@@ -86,7 +108,6 @@ function edge(
 export interface DiagramResult {
   nodes: Node[];
   edges: Edge[];
-  /** Bounding box so the parent can size the canvas */
   width: number;
   height: number;
 }
@@ -95,187 +116,265 @@ export function buildDiagram(
   tier: Tier,
   selections: RecipeItem[],
   addons: Addon,
-  _region: Region,
+  region: Region,
 ): DiagramResult {
-  const ids = new Set(selections.map((s) => s.id));
-  const has = (id: string) => ids.has(id);
+  const plan = buildDeploymentPlan(tier, selections, addons, region);
+  const ids  = new Set(selections.map((s) => s.id));
+  const has  = (id: string) => ids.has(id);
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // ── Feature flags ───────────────────────────────────────────────────────
-  const isStatic     = has('style-static');
-  const hasWebAPI    = has('style-website-api');
-  const isAPIFirst   = has('style-api-first');
-  const isRealtime   = has('style-realtime');
-  const hasJobs      = has('style-jobs');
+  // ── Bucket components by diagram group ──────────────────────────────────
+  const byGroup = (g: string) =>
+    plan.components.filter((c) => c.diagramGroup === g);
 
-  const hasSQL       = has('data-sql');
-  const hasNoSQL     = has('data-nosql');
-  const hasFiles     = has('data-files');
-  const hasCache     = has('data-cache');
-  const hasSearch    = has('data-search');
+  const extLeft  = byGroup('external-left').filter(
+    (c) => !['vpc', 'internet', 'dns'].includes(c.id),
+  );
+  const internet = plan.components.find((c) => c.id === 'internet');
+  const cdn      = plan.components.find((c) => c.id === 'cdn');
+  const waf      = plan.components.find((c) => c.id === 'waf');
+  const publicC  = byGroup('public');
+  const appC     = byGroup('app');
+  const dataC    = byGroup('data');
+  const asyncC   = byGroup('async');
+  const extRight = byGroup('external-right');
 
-  const hasWAF       = has('sec-waf');
-  const hasCompli    = has('sec-compliance');
+  // ── Y cursor helpers ─────────────────────────────────────────────────────
 
-  const isMultiAZ    = has('rel-multi-az');
-  const hasCICD      = addons.cicd;
+  // External left: stack nodes vertically
+  let extLY = Y_TOP;
+  const placeExtL = (comp: PlanComponent) => {
+    nodes.push(serviceNode(comp, X_EXT_L, extLY));
+    extLY += NODE_H + GAP;
+  };
 
-  const hasBasicMon  = has('ops-basic');
-  const hasAdvMon    = has('ops-advanced');
+  // External right: stack nodes vertically
+  let extRY = Y_TOP;
+  const placeExtR = (comp: PlanComponent) => {
+    nodes.push(serviceNode(comp, X_EXT_R, extRY));
+    extRY += NODE_H + GAP;
+  };
 
-  const hasCompute   = !isStatic || hasWebAPI || isAPIFirst || isRealtime || hasJobs;
+  // ── 1. External-left nodes ───────────────────────────────────────────────
+  if (internet) placeExtL(internet);
+  if (waf)      placeExtL(waf);
+  if (cdn)      placeExtL(cdn);
+  // remaining ext-left (ACM, etc) — skip rendering to reduce noise (shown in BOM only)
 
-  // ── Track data column Y cursor ───────────────────────────────────────────
-  let dataY = ROW_TOP;
-  const dataPush = () => { const y = dataY; dataY += NODE_H + 24; return y; };
+  // ── 2. VPC subnet rows ───────────────────────────────────────────────────
+  // Calculate how many rows we need and total VPC height
 
-  // ── Track right-side extras ──────────────────────────────────────────────
-  let extrasX = 960;
-  let extrasY = 60;
-  const extrasPush = () => { const y = extrasY; extrasY += NODE_H + 24; return y; };
+  const hasPublic  = publicC.length > 0;
+  const hasApp     = appC.length > 0;
+  const asyncInApp = asyncC.length > 0; // queue+worker sit in async row between app and data
+  const dataCount  = dataC.length;
 
-  // ── 1. Internet ──────────────────────────────────────────────────────────
-  nodes.push(serviceNode('internet', 'Internet', 'Public traffic', COL_INTERNET, ROW_MID, 'slate'));
+  // Each subnet row height
+  const publicRowH = hasPublic  ? ROW_H : 0;
+  const appRowH    = hasApp     ? ROW_H : 0;
+  const asyncRowH  = asyncInApp ? ROW_H : 0;
+  const dataRowH   = dataCount  > 0 ? Math.ceil(dataCount / 2) * (NODE_H + GAP) + SUBNET_PAD_V * 2 - GAP : 0;
 
-  // ── 2. WAF (optional) ────────────────────────────────────────────────────
-  let edgeSource = 'internet';
-  if (hasWAF) {
-    nodes.push(serviceNode('waf', 'WAF', 'Rate limiting & rules', COL_EDGE - 10, ROW_TOP, 'amber'));
-    edges.push(edge('e-internet-waf', 'internet', 'waf'));
-    edgeSource = 'waf';
-  }
+  // Y positions of subnet rows (relative to VPC top)
+  const publicSubY = Y_VPC_TOP + SUBNET_GAP;
+  const appSubY    = publicSubY + publicRowH + (hasPublic ? SUBNET_GAP : 0);
+  const asyncSubY  = appSubY + appRowH + (hasApp ? SUBNET_GAP : 0);
+  const dataSubY   = asyncSubY + asyncRowH + (asyncInApp ? SUBNET_GAP : 0);
 
-  // ── 3. CDN / static layer ─────────────────────────────────────────────────
-  let frontendTarget = '';
-  if (isStatic || hasWebAPI) {
-    nodes.push(serviceNode('cdn', 'CDN', 'Static assets', COL_EDGE, ROW_MID, 'cyan'));
-    edges.push(edge('e-src-cdn', edgeSource, 'cdn', has('sec-https') ? 'HTTPS/TLS' : undefined));
-    frontendTarget = 'cdn';
-    if (hasWebAPI || isStatic) {
-      nodes.push(serviceNode('s3-frontend', 'Object Store', 'Static files / frontend', COL_DATA, dataY > ROW_TOP ? dataY : ROW_TOP, 'blue'));
-      const y = dataY; dataPush();
-      nodes[nodes.length - 1].position.y = y;
-      edges.push(edge('e-cdn-s3', 'cdn', 's3-frontend'));
-    }
-  }
+  const vpcW = plan.vpc.multiAZ ? (X_DATA - X_VPC + NODE_W + 20 + 200) : (X_DATA - X_VPC + NODE_W + 20);
+  const vpcH = dataSubY + dataRowH + SUBNET_GAP * 2;
 
-  // ── 4. Load balancer / API Gateway ───────────────────────────────────────
-  let lbId = '';
-  if (!isStatic || hasWebAPI || isAPIFirst || isRealtime || hasJobs) {
-    if (isRealtime) {
-      lbId = 'wsapi';
-      nodes.push(serviceNode('wsapi', 'WebSocket API', 'Real-time connections', COL_EDGE, ROW_BOT, 'blue'));
-      edges.push(edge('e-src-wsapi', edgeSource, 'wsapi', has('sec-https') ? 'WSS/TLS' : undefined));
-    } else if (hasWebAPI || isAPIFirst || hasJobs) {
-      lbId = 'alb';
-      nodes.push(serviceNode('alb', 'HTTPS Load Balancer', 'Routes API traffic', COL_EDGE, frontendTarget ? ROW_BOT : ROW_MID, 'blue'));
-      const srcLabel = has('sec-https') ? 'HTTPS/TLS' : undefined;
-      if (frontendTarget) {
-        edges.push(edge('e-src-alb', edgeSource, 'alb', srcLabel));
-      } else {
-        edges.push(edge('e-internet-alb', 'internet', 'alb', srcLabel));
-      }
-    }
-  }
+  // Add multi-AZ second column if needed — visual only
+  const multiAZ = plan.vpc.multiAZ;
+  const vpcRight = X_VPC + vpcW;
 
-  // ── 5. Compute ───────────────────────────────────────────────────────────
-  let computeY = ROW_MID;
-  if (frontendTarget && lbId) computeY = (ROW_MID + ROW_BOT) / 2;
-  else if (frontendTarget) computeY = ROW_BOT;
+  // ── VPC background ───────────────────────────────────────────────────────
+  nodes.unshift(groupNode(
+    'g-vpc',
+    multiAZ ? 'VPC  ·  Multi-AZ HA' : 'VPC',
+    X_VPC,
+    Y_VPC_TOP,
+    vpcW,
+    vpcH,
+    'slate',
+    -3,
+  ));
 
-  if (hasCompute) {
-    const computeLabel = isRealtime
-      ? 'Compute (WS handlers)'
-      : isAPIFirst
-      ? 'API Compute'
-      : 'App Compute';
-    const computeSub = tier === 3
-      ? 'Containers / Serverless'
-      : 'Serverless / Containers (AspenX)';
-    nodes.push(serviceNode('compute', computeLabel, computeSub, COL_COMPUTE, computeY, 'cyan'));
-
-    if (lbId) {
-      edges.push(edge('e-lb-compute', lbId, 'compute'));
-    } else if (frontendTarget === 'cdn') {
-      edges.push(edge('e-cdn-compute', 'cdn', 'compute'));
-    } else {
-      edges.push(edge('e-internet-compute', 'internet', 'compute'));
-    }
-  }
-
-  // ── 6. Background jobs ────────────────────────────────────────────────────
-  if (hasJobs) {
-    const queueY = computeY + NODE_H + 32;
-    nodes.push(serviceNode('queue', 'Message Queue', 'Async tasks', COL_COMPUTE, queueY, 'purple'));
-    nodes.push(serviceNode('worker', 'Worker', 'Background processing', COL_DATA, queueY, 'purple'));
-    edges.push(edge('e-compute-queue', 'compute', 'queue', undefined, true));
-    edges.push(edge('e-queue-worker', 'queue', 'worker', undefined, true));
-  }
-
-  // ── 7. Data layer ─────────────────────────────────────────────────────────
-  const dataComputeTarget = hasCompute ? 'compute' : (lbId || 'internet');
-
-  if (hasSQL) {
-    nodes.push(serviceNode('rds', 'Relational DB', 'Postgres (managed)', COL_DATA, dataPush(), 'emerald'));
-    edges.push(edge('e-compute-rds', dataComputeTarget, 'rds'));
-  }
-  if (hasNoSQL) {
-    nodes.push(serviceNode('nosql', 'Key-Value Store', 'NoSQL (managed)', COL_DATA, dataPush(), 'emerald'));
-    edges.push(edge('e-compute-nosql', dataComputeTarget, 'nosql'));
-  }
-  if (hasCache) {
-    nodes.push(serviceNode('cache', 'Cache', 'Redis (in-memory)', COL_DATA, dataPush(), 'cyan'));
-    edges.push(edge('e-compute-cache', dataComputeTarget, 'cache'));
-  }
-  if (hasSearch) {
-    nodes.push(serviceNode('search', 'Search Index', 'Full-text search', COL_DATA, dataPush(), 'blue'));
-    edges.push(edge('e-compute-search', dataComputeTarget, 'search'));
-  }
-  if (hasFiles && !has('style-static') && !has('style-website-api')) {
-    nodes.push(serviceNode('files', 'Object Storage', 'File uploads', COL_DATA, dataPush(), 'slate'));
-    edges.push(edge('e-compute-files', dataComputeTarget, 'files'));
-  }
-
-  // ── 8. Observability ─────────────────────────────────────────────────────
-  if (hasBasicMon || hasAdvMon) {
-    const monLabel = hasAdvMon ? 'Monitoring & Tracing' : 'Monitoring & Logs';
-    const monSub   = hasAdvMon ? 'Metrics, traces, SLOs' : 'Metrics + alerts';
-    nodes.push(serviceNode('monitoring', monLabel, monSub, extrasX, extrasPush(), 'rose'));
-    if (hasCompute) edges.push(edge('e-compute-mon', 'compute', 'monitoring'));
-  }
-
-  // ── 9. Compliance ────────────────────────────────────────────────────────
-  if (hasCompli) {
-    nodes.push(serviceNode('audit', 'Audit & Encryption', 'Logs + KMS encryption', extrasX, extrasPush(), 'amber'));
-  }
-
-  // ── 10. CI/CD ────────────────────────────────────────────────────────────
-  if (hasCICD) {
-    nodes.push(serviceNode('cicd', 'CI/CD Pipeline', 'Automated deployments', extrasX, extrasPush(), 'purple'));
-    if (hasCompute) edges.push(edge('e-cicd-compute', 'cicd', 'compute', undefined, true));
-  }
-
-  // ── 11. Multi-AZ group label ─────────────────────────────────────────────
-  if (isMultiAZ) {
-    // Place a background group behind the VPC core (compute + data)
-    nodes.unshift(groupNode(
-      'vpc',
-      isMultiAZ ? 'VPC  ·  Multi-AZ' : 'VPC',
-      COL_EDGE - 20,
-      ROW_TOP - 40,
-      COL_DATA + NODE_W + 40 - (COL_EDGE - 20),
-      Math.max(dataY, extrasY, ROW_EXTRA) + NODE_H,
-      'slate',
+  // ── Public subnet background ─────────────────────────────────────────────
+  if (hasPublic) {
+    const subW = multiAZ ? vpcW - 10 : X_DATA - X_VPC + NODE_W + 10;
+    nodes.push(groupNode(
+      'g-public',
+      multiAZ ? 'Public Subnet  ·  AZ-a  /  AZ-b' : 'Public Subnet',
+      X_VPC + 5,
+      publicSubY,
+      subW,
+      publicRowH,
+      'blue',
+      -2,
     ));
+    publicC.forEach((c, i) => {
+      const x = X_PUBLIC + i * (NODE_W + GAP);
+      const y = publicSubY + SUBNET_PAD_V;
+      nodes.push(serviceNode(c, x, y));
+    });
+  }
+
+  // ── Private App subnet background ────────────────────────────────────────
+  if (hasApp) {
+    const subW = multiAZ ? vpcW - 10 : X_APP - X_VPC + NODE_W + 10;
+    nodes.push(groupNode(
+      'g-app',
+      multiAZ ? 'Private App Subnet  ·  AZ-a  /  AZ-b' : 'Private App Subnet',
+      X_VPC + 5,
+      appSubY,
+      subW,
+      appRowH,
+      'cyan',
+      -2,
+    ));
+    appC.forEach((c, i) => {
+      nodes.push(serviceNode(c, X_APP + i * (NODE_W + GAP), appSubY + SUBNET_PAD_V));
+    });
+  }
+
+  // ── Async row ────────────────────────────────────────────────────────────
+  if (asyncInApp) {
+    const subW = X_DATA - X_VPC + NODE_W + 10;
+    nodes.push(groupNode(
+      'g-async',
+      'Async Layer',
+      X_VPC + 5,
+      asyncSubY,
+      subW,
+      asyncRowH,
+      'purple',
+      -2,
+    ));
+    asyncC.forEach((c, i) => {
+      nodes.push(serviceNode(c, X_APP + i * (NODE_W + GAP), asyncSubY + SUBNET_PAD_V));
+    });
+  }
+
+  // ── Private Data subnet background ───────────────────────────────────────
+  if (dataCount > 0) {
+    const subW = multiAZ ? vpcW - 10 : X_DATA - X_VPC + NODE_W + 10;
+    nodes.push(groupNode(
+      'g-data',
+      multiAZ ? 'Private Data Subnet  ·  AZ-a  /  AZ-b' : 'Private Data Subnet',
+      X_VPC + 5,
+      dataSubY,
+      subW,
+      dataRowH,
+      'emerald',
+      -2,
+    ));
+    dataC.forEach((c, i) => {
+      const row = Math.floor(i / 2);
+      const col = i % 2;
+      nodes.push(serviceNode(
+        c,
+        X_DATA + col * (NODE_W + GAP),
+        dataSubY + SUBNET_PAD_V + row * (NODE_H + GAP),
+      ));
+    });
+  }
+
+  // ── 3. External-right nodes ──────────────────────────────────────────────
+  extRight.forEach((c) => placeExtR(c));
+
+  // ── 4. Multi-AZ replica column (visual ghost) ─────────────────────────────
+  if (multiAZ && (hasPublic || hasApp || dataCount > 0)) {
+    const colX = X_VPC + (vpcW / 2) + 5;
+    if (hasPublic) {
+      nodes.push(groupNode('g-pub-b', 'AZ-b replica', colX, publicSubY + 4, vpcW / 2 - 15, publicRowH - 8, 'slate', -1));
+    }
+    if (hasApp) {
+      nodes.push(groupNode('g-app-b', 'AZ-b replica', colX, appSubY + 4, vpcW / 2 - 15, appRowH - 8, 'slate', -1));
+    }
+    if (dataCount > 0) {
+      nodes.push(groupNode('g-data-b', 'AZ-b standby', colX, dataSubY + 4, vpcW / 2 - 15, dataRowH - 8, 'slate', -1));
+    }
+  }
+
+  // ── 5. Edges ─────────────────────────────────────────────────────────────
+
+  const hasWAF     = !!waf;
+  const hasCDN     = !!cdn;
+  const hasHTTPS   = has('sec-https');
+  const edgeSrc    = hasWAF ? 'waf' : 'internet';
+  const tlsLabel   = hasHTTPS ? 'HTTPS/TLS' : undefined;
+
+  // Internet → WAF
+  if (hasWAF) {
+    edges.push(mkEdge('e-internet-waf', 'internet', 'waf'));
+  }
+
+  // Internet/WAF → CDN
+  if (hasCDN) {
+    edges.push(mkEdge('e-src-cdn', edgeSrc, 'cdn', { label: tlsLabel }));
+  }
+
+  // CDN → frontend S3
+  if (hasCDN && plan.components.find((c) => c.id === 's3-frontend')) {
+    edges.push(mkEdge('e-cdn-s3', 'cdn', 's3-frontend'));
+  }
+
+  // Entry (WAF/Internet/CDN) → ALB or WS API
+  const alb   = plan.components.find((c) => c.id === 'alb');
+  const wsapi = plan.components.find((c) => c.id === 'wsapi');
+  if (alb) {
+    const src = hasCDN ? edgeSrc : edgeSrc;
+    edges.push(mkEdge('e-src-alb', src, 'alb', { label: tlsLabel }));
+  }
+  if (wsapi) {
+    edges.push(mkEdge('e-src-wsapi', edgeSrc, 'wsapi', { label: hasHTTPS ? 'WSS/TLS' : undefined }));
+  }
+
+  // Public → Compute
+  const computeNode = plan.components.find((c) => c.id === 'compute');
+  if (computeNode) {
+    const entryId = alb ? 'alb' : wsapi ? 'wsapi' : hasCDN ? 'cdn' : 'internet';
+    edges.push(mkEdge('e-entry-compute', entryId, 'compute'));
+  }
+
+  // Compute → data nodes (solid)
+  const dataIds = dataC.map((c) => c.id);
+  dataIds.forEach((did) => {
+    if (computeNode || alb) {
+      const src = computeNode ? 'compute' : 'alb';
+      edges.push(mkEdge(`e-compute-${did}`, src, did));
+    }
+  });
+
+  // Compute → Queue (dashed/animated)
+  if (plan.components.find((c) => c.id === 'queue')) {
+    edges.push(mkEdge('e-compute-queue', 'compute', 'queue', { variant: 'dashed', animated: true }));
+  }
+
+  // Queue → Worker (dashed/animated)
+  if (plan.components.find((c) => c.id === 'worker')) {
+    edges.push(mkEdge('e-queue-worker', 'queue', 'worker', { variant: 'dashed', animated: true }));
+  }
+
+  // Compute → Monitoring (dotted)
+  if (plan.components.find((c) => c.id === 'monitoring')) {
+    const src = computeNode ? 'compute' : (alb ? 'alb' : 'internet');
+    edges.push(mkEdge('e-compute-mon', src, 'monitoring', { variant: 'dotted' }));
+  }
+
+  // CI/CD → Compute (dashed)
+  if (plan.components.find((c) => c.id === 'cicd') && computeNode) {
+    edges.push(mkEdge('e-cicd-compute', 'cicd', 'compute', { variant: 'dashed', animated: true }));
   }
 
   // ── Bounding box ─────────────────────────────────────────────────────────
-  const allX = nodes.map((n) => (n.position?.x ?? 0) + ((n.style?.width as number) ?? NODE_W));
-  const allY = nodes.map((n) => (n.position?.y ?? 0) + ((n.style?.height as number) ?? NODE_H));
-  const width  = Math.max(...allX) + 80;
-  const height = Math.max(...allY) + 80;
+  const allX = nodes.map((n) => (n.position?.x ?? 0) + Number(n.style?.width  ?? NODE_W));
+  const allY = nodes.map((n) => (n.position?.y ?? 0) + Number(n.style?.height ?? NODE_H));
+  const width  = Math.max(...allX, vpcRight + 60) + 60;
+  const height = Math.max(...allY) + 60;
 
   return { nodes, edges, width, height };
 }

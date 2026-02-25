@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { loadBuilderState, saveOrder } from '../lib/storage';
 import { calculateEstimate, formatUSD, STARTS_FROM } from '../lib/pricing';
+import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
 import type { Tier, RecipeItem, Addon, Region } from '../lib/types';
 
@@ -100,6 +101,7 @@ export default function CheckoutPage() {
   if (!tier || selections.length === 0) return null;
 
   const estimate = calculateEstimate(tier, selections, addons, region);
+  const plan     = buildDeploymentPlan(tier, selections, addons, region);
   const nextSteps = TIER_NEXT_STEPS[tier];
 
   return (
@@ -285,7 +287,46 @@ export default function CheckoutPage() {
             </Suspense>
           </Card>
 
-          {/* ── E. Next steps ────────────────────────────────────────────── */}
+          {/* ── E. Deployment plan BOM ──────────────────────────────────── */}
+          <DeploymentBOM plan={plan} />
+
+          {/* ── F. Data flows ────────────────────────────────────────────── */}
+          {plan.flows.length > 0 && (
+            <Card>
+              <SectionHeading>Data flows</SectionHeading>
+              <div className="space-y-4">
+                {plan.flows.map((flow) => {
+                  const flowColor =
+                    flow.type === 'request'   ? 'border-cyan-500/30 text-cyan-400'    :
+                    flow.type === 'upload'    ? 'border-blue-500/30 text-blue-400'    :
+                    flow.type === 'async'     ? 'border-purple-500/30 text-purple-400' :
+                    'border-rose-500/30 text-rose-400';
+                  return (
+                    <div key={flow.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-slate-950 ${flowColor}`}>
+                          {flow.type}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-200">{flow.name}</span>
+                      </div>
+                      <ol className="space-y-1.5">
+                        {flow.steps.map((step, si) => (
+                          <li key={si} className="flex items-start gap-2.5 text-xs text-slate-400">
+                            <span className="flex-shrink-0 w-4 h-4 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[9px] font-bold text-slate-600 mt-0.5">
+                              {si + 1}
+                            </span>
+                            {step}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* ── G. Next steps ────────────────────────────────────────────── */}
           <Card>
             <SectionHeading>{nextSteps.title}</SectionHeading>
             <ol className="space-y-2">
@@ -300,7 +341,7 @@ export default function CheckoutPage() {
             </ol>
           </Card>
 
-          {/* ── F. Pay button ────────────────────────────────────────────── */}
+          {/* ── H. Pay button ────────────────────────────────────────────── */}
           <PaySection
             tier={tier}
             region={region}
@@ -333,6 +374,125 @@ interface PaySectionProps {
   firebaseReady: boolean;
   signInWithGoogle: () => Promise<void>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deployment BOM accordion
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DeploymentBOM({ plan }: { plan: DeploymentPlan }) {
+  const [openCats, setOpenCats] = useState<Set<string>>(new Set(['compute', 'edge', 'data']));
+
+  const toggle = (cat: string) =>
+    setOpenCats((prev) => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+
+  // Group components by category, skip internet/dns/vpc (too low-level for BOM)
+  const skipIds = new Set(['internet', 'dns', 'vpc']);
+  const grouped = plan.components
+    .filter((c) => !skipIds.has(c.id))
+    .reduce<Record<string, typeof plan.components>>((acc, c) => {
+      (acc[c.category] ??= []).push(c);
+      return acc;
+    }, {});
+
+  const catOrder: string[] = ['edge', 'compute', 'realtime', 'data', 'async', 'ops', 'compliance', 'cicd'];
+  const orderedCats = catOrder.filter((k) => grouped[k]);
+
+  if (orderedCats.length === 0) return null;
+
+  return (
+    <Card>
+      <SectionHeading>Deployment plan — AWS components</SectionHeading>
+      <div className="space-y-2">
+        {orderedCats.map((cat) => {
+          const meta = CATEGORY_META[cat as keyof typeof CATEGORY_META];
+          const items = grouped[cat];
+          const isOpen = openCats.has(cat);
+          return (
+            <div key={cat} className="rounded-lg border border-slate-800 overflow-hidden">
+              <button
+                onClick={() => toggle(cat)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/60 hover:bg-slate-800/60 transition-colors focus:outline-none"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base leading-none">{meta.icon}</span>
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-[10px] text-slate-600 font-normal">
+                    {items.length} component{items.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <svg
+                  className={`w-4 h-4 text-slate-600 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {isOpen && (
+                <div className="divide-y divide-slate-800/60">
+                  {items.map((comp) => (
+                    <div key={comp.id} className="px-4 py-3 bg-slate-950/40 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">{comp.name}</p>
+                          <p className="text-xs text-slate-500">{comp.sub}</p>
+                        </div>
+                      </div>
+
+                      {/* AWS service chips */}
+                      {comp.awsServices.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {comp.awsServices.map((svc) => (
+                            <span
+                              key={svc}
+                              className="text-[10px] px-2 py-0.5 rounded-full border border-slate-700 bg-slate-800 text-slate-400 font-medium"
+                            >
+                              {svc}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Details */}
+                      <ul className="space-y-1">
+                        {comp.details.map((d, di) => (
+                          <li key={di} className="flex items-start gap-2 text-xs text-slate-400">
+                            <span className="text-slate-700 mt-0.5 flex-shrink-0">›</span>
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* Driven by */}
+                      {comp.drivenBy.length > 0 && (
+                        <p className="text-[10px] text-slate-600">
+                          Driven by: {comp.drivenBy.join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-slate-700 mt-3 leading-relaxed">
+        This is your reference deployment manifest. AspenX will map these components to your exact Terraform config after the scoping call.
+      </p>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pay section (isolated so auth state change re-renders only this)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function PaySection({
   tier,
