@@ -2,8 +2,6 @@ import React, { useCallback, useRef } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
-  useNodesState,
-  useEdgesState,
   type NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -13,17 +11,17 @@ import type { Tier, RecipeItem, Addon, Region } from '../lib/types';
 import { buildDiagram } from '../lib/diagram';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Accent colour map
+// Accent colour tokens
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ACCENT: Record<string, { border: string; glow: string; icon: string; text: string }> = {
-  cyan:    { border: '#06b6d4', glow: 'rgba(6,182,212,0.2)',   icon: '⬡', text: '#67e8f9' },
-  blue:    { border: '#3b82f6', glow: 'rgba(59,130,246,0.2)',  icon: '◈', text: '#93c5fd' },
-  purple:  { border: '#a855f7', glow: 'rgba(168,85,247,0.2)',  icon: '◆', text: '#d8b4fe' },
-  amber:   { border: '#f59e0b', glow: 'rgba(245,158,11,0.2)',  icon: '⬟', text: '#fcd34d' },
-  emerald: { border: '#10b981', glow: 'rgba(16,185,129,0.2)',  icon: '●', text: '#6ee7b7' },
-  rose:    { border: '#f43f5e', glow: 'rgba(244,63,94,0.2)',   icon: '◉', text: '#fda4af' },
-  slate:   { border: '#475569', glow: 'rgba(71,85,105,0.15)',  icon: '○', text: '#94a3b8' },
+const ACCENT: Record<string, { border: string; glow: string; hdr: string; icon: string; text: string }> = {
+  cyan:    { border: '#06b6d4', glow: 'rgba(6,182,212,0.18)',   hdr: 'rgba(6,182,212,0.08)',    icon: '⬡', text: '#67e8f9' },
+  blue:    { border: '#3b82f6', glow: 'rgba(59,130,246,0.18)',  hdr: 'rgba(59,130,246,0.08)',   icon: '◈', text: '#93c5fd' },
+  purple:  { border: '#a855f7', glow: 'rgba(168,85,247,0.18)',  hdr: 'rgba(168,85,247,0.08)',   icon: '◆', text: '#d8b4fe' },
+  amber:   { border: '#f59e0b', glow: 'rgba(245,158,11,0.18)',  hdr: 'rgba(245,158,11,0.08)',   icon: '⬟', text: '#fcd34d' },
+  emerald: { border: '#10b981', glow: 'rgba(16,185,129,0.18)',  hdr: 'rgba(16,185,129,0.08)',   icon: '●', text: '#6ee7b7' },
+  rose:    { border: '#f43f5e', glow: 'rgba(244,63,94,0.18)',   hdr: 'rgba(244,63,94,0.08)',    icon: '◉', text: '#fda4af' },
+  slate:   { border: '#475569', glow: 'rgba(71,85,105,0.12)',   hdr: 'rgba(71,85,105,0.10)',    icon: '○', text: '#94a3b8' },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,25 +35,43 @@ function ServiceNode({ data }: NodeProps) {
       style={{
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
         border: `1px solid ${a.border}`,
-        boxShadow: `0 0 12px ${a.glow}, inset 0 1px 0 rgba(255,255,255,0.04)`,
-        borderRadius: 10,
-        padding: '10px 12px',
+        boxShadow: `0 0 10px ${a.glow}, inset 0 1px 0 rgba(255,255,255,0.04)`,
+        borderRadius: 9,
+        padding: '9px 11px',
         width: '100%',
         height: '100%',
         display: 'flex',
         alignItems: 'flex-start',
         gap: 8,
         boxSizing: 'border-box',
+        cursor: 'default',
       }}
     >
-      <span style={{ fontSize: 18, lineHeight: 1, color: a.border, flexShrink: 0, marginTop: 1 }}>
+      <span style={{ fontSize: 16, lineHeight: 1, color: a.border, flexShrink: 0, marginTop: 1 }}>
         {a.icon}
       </span>
       <div style={{ minWidth: 0 }}>
-        <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <p style={{
+          margin: 0,
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#f1f5f9',
+          lineHeight: 1.3,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
           {data.label}
         </p>
-        <p style={{ margin: '2px 0 0', fontSize: 9, color: '#64748b', lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <p style={{
+          margin: '2px 0 0',
+          fontSize: 9,
+          color: '#64748b',
+          lineHeight: 1.3,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
           {data.sub}
         </p>
       </div>
@@ -64,7 +80,8 @@ function ServiceNode({ data }: NodeProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Custom node: group / VPC background box
+// Custom node: group container (VPC / subnet)
+// Header band occupies the top 34px — service nodes must start below this
 // ─────────────────────────────────────────────────────────────────────────────
 
 function GroupNode({ data }: NodeProps) {
@@ -74,26 +91,42 @@ function GroupNode({ data }: NodeProps) {
       style={{
         width: '100%',
         height: '100%',
-        border: `1px dashed ${a.border}`,
-        borderRadius: 14,
-        background: `linear-gradient(135deg, rgba(15,23,42,0.6) 0%, rgba(30,41,59,0.3) 100%)`,
+        border: `1.5px dashed ${a.border}`,
+        borderRadius: 12,
+        background: 'rgba(15,23,42,0.4)',
         boxSizing: 'border-box',
         pointerEvents: 'none',
+        overflow: 'hidden', // clips header to border-radius
       }}
     >
-      <span style={{
-        position: 'absolute',
-        top: 8,
-        left: 12,
-        fontSize: 9,
-        fontWeight: 700,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: a.text,
-        opacity: 0.8,
-      }}>
-        {data.label}
-      </span>
+      {/* ── Header band — label lives here; no nodes may overlap this area ── */}
+      <div
+        style={{
+          height: 34,
+          background: `linear-gradient(90deg, ${a.hdr} 0%, transparent 80%)`,
+          borderBottom: `1px solid ${a.border}22`,
+          display: 'flex',
+          alignItems: 'center',
+          paddingLeft: 12,
+          paddingRight: 12,
+          gap: 6,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.09em',
+            textTransform: 'uppercase',
+            color: a.text,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {data.label}
+        </span>
+      </div>
     </div>
   );
 }
@@ -117,57 +150,48 @@ export default function ArchitectureDiagram({
   selections,
   addons,
 }: ArchitectureDiagramProps) {
-  const { nodes: initNodes, edges: initEdges } = buildDiagram(tier, selections, addons, region);
-  const [nodes, , onNodesChange] = useNodesState(initNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initEdges);
+  // Compute once — no state needed for a static diagram
+  const { nodes, edges } = buildDiagram(tier, selections, addons, region);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dateStr = new Date().toISOString().slice(0, 10);
 
   // ── Export helpers ────────────────────────────────────────────────────────
 
-  const dateStr = new Date().toISOString().slice(0, 10);
-
-  const captureNode = useCallback(async (): Promise<string> => {
-    const el = containerRef.current?.querySelector('.react-flow__renderer') as HTMLElement | null
-      ?? containerRef.current as HTMLElement;
+  const capture = useCallback(async (): Promise<string> => {
+    const el = containerRef.current;
     if (!el) throw new Error('Canvas not ready');
     return toPng(el, {
       pixelRatio: 2,
       backgroundColor: '#020817',
-      style: { borderRadius: '12px' },
     });
   }, []);
 
   const downloadPNG = useCallback(async () => {
     try {
-      const dataUrl = await captureNode();
+      const url = await capture();
       const a = document.createElement('a');
-      a.href = dataUrl;
+      a.href = url;
       a.download = `aspenx-architecture-${dateStr}.png`;
       a.click();
-    } catch {
-      // silent — canvas may not be ready
-    }
-  }, [captureNode, dateStr]);
+    } catch { /* silent */ }
+  }, [capture, dateStr]);
 
   const downloadPDF = useCallback(async () => {
     try {
-      const dataUrl = await captureNode();
+      const url = await capture();
       const img = new Image();
-      img.src = dataUrl;
-      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
-      const landscape = img.width > img.height;
+      img.src = url;
+      await new Promise<void>((res) => { img.onload = () => res(); });
       const pdf = new jsPDF({
-        orientation: landscape ? 'landscape' : 'portrait',
+        orientation: img.width > img.height ? 'landscape' : 'portrait',
         unit: 'px',
         format: [img.width / 2, img.height / 2],
       });
-      pdf.addImage(dataUrl, 'PNG', 0, 0, img.width / 2, img.height / 2);
+      pdf.addImage(url, 'PNG', 0, 0, img.width / 2, img.height / 2);
       pdf.save(`aspenx-architecture-${dateStr}.pdf`);
-    } catch {
-      // silent
-    }
-  }, [captureNode, dateStr]);
+    } catch { /* silent */ }
+  }, [capture, dateStr]);
 
   return (
     <div className="space-y-3">
@@ -200,28 +224,37 @@ export default function ArchitectureDiagram({
         </div>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas — fully static: no drag, no pan, no zoom interactions */}
       <div
         ref={containerRef}
         className="rounded-xl overflow-hidden border border-slate-800"
-        style={{ height: 420, background: '#020817' }}
+        style={{ height: 440, background: '#020817' }}
       >
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
           nodeTypes={NODE_TYPES}
+          // ── Static interaction locks ──────────────────────────────────────
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          panOnDrag={false}
+          panOnScroll={false}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          zoomOnDoubleClick={false}
+          preventScrolling={false}   // page scroll still works normally
+          // ── View ─────────────────────────────────────────────────────────
           fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.3}
-          maxZoom={2}
+          fitViewOptions={{ padding: 0.18, minZoom: 0.2, maxZoom: 1 }}
+          minZoom={0.1}
+          maxZoom={1.5}
           attributionPosition="bottom-left"
           proOptions={{ hideAttribution: true }}
         >
           <Background
             variant={BackgroundVariant.Dots}
-            gap={24}
+            gap={22}
             size={1}
             color="#1e293b"
           />
