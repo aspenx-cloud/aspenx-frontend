@@ -7,8 +7,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
-import type { Tier, RecipeItem, Addon, Region } from '../lib/types';
 import { buildDiagram } from '../lib/diagram';
+import type { DeploymentPlan } from '../lib/plan';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Accent colour tokens
@@ -138,20 +138,12 @@ const NODE_TYPES = { serviceNode: ServiceNode, groupNode: GroupNode };
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ArchitectureDiagramProps {
-  tier: Tier;
-  region: Region;
-  selections: RecipeItem[];
-  addons: Addon;
+  plan: DeploymentPlan;
 }
 
-export default function ArchitectureDiagram({
-  tier,
-  region,
-  selections,
-  addons,
-}: ArchitectureDiagramProps) {
+export default function ArchitectureDiagram({ plan }: ArchitectureDiagramProps) {
   // Compute once — no state needed for a static diagram
-  const { nodes, edges } = buildDiagram(tier, selections, addons, region);
+  const { nodes, edges } = buildDiagram(plan.tier, plan.selections, plan.addons, plan.region);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dateStr = new Date().toISOString().slice(0, 10);

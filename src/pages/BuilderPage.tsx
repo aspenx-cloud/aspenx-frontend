@@ -20,6 +20,7 @@ import { TOPICS } from '../lib/mappings';
 import { REGIONS, DEFAULT_REGION } from '../lib/types';
 import type { Tier, Region, RecipeItem, Addon } from '../lib/types';
 import { loadBuilderState, saveBuilderState, clearBuilderState } from '../lib/storage';
+import { buildDeploymentPlan } from '../lib/plan';
 import { useAuth } from '../contexts/AuthContext';
 
 const VALID_TIERS: Tier[] = [1, 2, 3];
@@ -176,6 +177,8 @@ export default function BuilderPage() {
     );
   }
 
+  const plan = buildDeploymentPlan(tier, selections, addons, region);
+
   const selectedIds = new Set(selections.map((s) => s.id));
   const step = selections.length === 0 ? 1 : 2;
 
@@ -304,6 +307,7 @@ export default function BuilderPage() {
                 region={region}
                 selections={selections}
                 addons={addons}
+                plan={plan}
                 awsAccountId={awsAccountId}
                 onAwsAccountIdChange={setAwsAccountId}
                 awsConfirmed={awsConfirmed}

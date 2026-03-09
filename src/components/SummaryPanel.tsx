@@ -1,6 +1,6 @@
 import React from 'react';
-import type { Tier, RecipeItem, Addon, PriceEstimate, Region } from '../lib/types';
-import { calculateEstimate } from '../lib/pricing';
+import type { Tier, RecipeItem, Addon, Region } from '../lib/types';
+import type { DeploymentPlan } from '../lib/plan';
 import EstimateBox from './EstimateBox';
 
 const TIER_DESCRIPTIONS: Record<Tier, { title: string; desc: string }> = {
@@ -40,6 +40,7 @@ interface SummaryPanelProps {
   region: Region;
   selections: RecipeItem[];
   addons: Addon;
+  plan: DeploymentPlan | null;
   awsAccountId: string;
   onAwsAccountIdChange: (v: string) => void;
   awsConfirmed: boolean;
@@ -59,6 +60,7 @@ export default function SummaryPanel({
   region,
   selections,
   addons,
+  plan,
   awsAccountId,
   onAwsAccountIdChange,
   awsConfirmed,
@@ -72,8 +74,7 @@ export default function SummaryPanel({
   checkoutLoading,
   checkoutError,
 }: SummaryPanelProps) {
-  const estimate: PriceEstimate | null =
-    tier ? calculateEstimate(tier, selections, addons, region) : null;
+  const estimate = plan?.estimate ?? null;
 
   const warnings = tier
     ? VALIDATION_RULES.filter((r) => r.check(selections))

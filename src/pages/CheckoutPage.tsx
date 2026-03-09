@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { loadBuilderState, saveOrder } from '../lib/storage';
-import { calculateEstimate, formatUSD, STARTS_FROM } from '../lib/pricing';
+import { formatUSD, STARTS_FROM } from '../lib/pricing';
 import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
-import type { Tier, RecipeItem, Addon, Region } from '../lib/types';
+import type { Tier, RecipeItem, Addon, Region, PriceEstimate } from '../lib/types';
 
 // Lazy-load the heavy diagram component
 const ArchitectureDiagram = lazy(() => import('../components/ArchitectureDiagram'));
@@ -100,8 +100,8 @@ export default function CheckoutPage() {
 
   if (!tier || selections.length === 0) return null;
 
-  const estimate = calculateEstimate(tier, selections, addons, region);
-  const plan     = buildDeploymentPlan(tier, selections, addons, region);
+  const plan = buildDeploymentPlan(tier, selections, addons, region);
+  const estimate = plan.estimate;
   const nextSteps = TIER_NEXT_STEPS[tier];
 
   return (
@@ -278,12 +278,7 @@ export default function CheckoutPage() {
                 </div>
               }
             >
-              <ArchitectureDiagram
-                tier={tier}
-                region={region}
-                selections={selections}
-                addons={addons}
-              />
+              <ArchitectureDiagram plan={plan} />
             </Suspense>
           </Card>
 
@@ -369,7 +364,7 @@ interface PaySectionProps {
   selections: RecipeItem[];
   addons: Addon;
   awsAccountId: string;
-  estimate: ReturnType<typeof calculateEstimate>;
+  estimate: PriceEstimate;
   user: { email: string | null } | null;
   firebaseReady: boolean;
   signInWithGoogle: () => Promise<void>;

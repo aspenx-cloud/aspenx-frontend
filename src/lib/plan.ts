@@ -1,4 +1,5 @@
-import type { Tier, RecipeItem, Addon, Region } from './types';
+import type { Tier, RecipeItem, Addon, Region, PriceEstimate } from './types';
+import { calculateEstimate } from './pricing';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -52,9 +53,12 @@ export interface VpcPlan {
 export interface DeploymentPlan {
   tier: Tier;
   region: Region;
+  selections: RecipeItem[];
+  addons: Addon;
   vpc: VpcPlan;
   components: PlanComponent[];
   flows: PlanFlow[];
+  estimate: PriceEstimate;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -617,8 +621,13 @@ export function buildDeploymentPlan(
     });
   }
 
-  return { tier, region, vpc, components, flows };
+  const estimate = calculateEstimate(tier, selections, addons, region);
+
+  return { tier, region, selections, addons, vpc, components, flows, estimate };
 }
+
+// TODO: Add toTfRecipe(plan: DeploymentPlan): TfRecipe serializer here
+// when backend pipeline is ready (plan → tf_recipe.json → terraform execution).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category metadata (for UI rendering)
