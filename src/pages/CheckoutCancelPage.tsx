@@ -60,7 +60,7 @@ export default function CheckoutCancelPage() {
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => navigate('/#pricing')}
+            onClick={() => { navigate('/'); setTimeout(() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }), 120); }}
             className="flex-1 px-6 py-3 rounded-xl font-semibold text-sm
               bg-gradient-to-r from-cyan-500 to-blue-600
               hover:from-cyan-400 hover:to-blue-500
