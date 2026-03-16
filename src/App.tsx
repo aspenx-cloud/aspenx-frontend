@@ -5,6 +5,8 @@ import LandingPage from './pages/LandingPage';
 import BuilderPage from './pages/BuilderPage';
 import AccountPage from './pages/AccountPage';
 import CheckoutPage from './pages/CheckoutPage';
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import CheckoutCancelPage from './pages/CheckoutCancelPage';
 
 export default function App() {
   return (
@@ -14,6 +16,8 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/builder" element={<BuilderPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+          <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
           <Route path="/account" element={<AccountPage />} />
         </Routes>
       </HashRouter>
