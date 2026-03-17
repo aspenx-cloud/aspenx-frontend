@@ -18,6 +18,12 @@ export default function CheckoutSuccessPage() {
       <p style={{ marginBottom: '1.5rem', fontSize: '0.85rem', color: '#64748b', wordBreak: 'break-all' }}>
         session_id: {sessionId ?? '(none)'}
       </p>
+      <pre style={{ fontSize: '0.8rem', color: '#94a3b8', background: '#1e293b', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        href: {typeof window !== 'undefined' ? window.location.href : ''}
+        pathname: {typeof window !== 'undefined' ? window.location.pathname : ''}
+        hash: {typeof window !== 'undefined' ? window.location.hash : ''}
+        search: {typeof window !== 'undefined' ? window.location.search : ''}
+      </pre>
       <button
         onClick={() => navigate('/')}
         style={{ padding: '0.6rem 1.4rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', marginRight: '0.75rem' }}

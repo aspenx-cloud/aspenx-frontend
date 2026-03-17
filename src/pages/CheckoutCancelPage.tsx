@@ -10,9 +10,15 @@ export default function CheckoutCancelPage() {
         CANCEL PAGE RENDERED
       </p>
       <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Payment Not Completed</h1>
-      <p style={{ marginBottom: '1.5rem', color: '#94a3b8' }}>
+      <p style={{ marginBottom: '1rem', color: '#94a3b8' }}>
         No charge was made. You can return and try again whenever you are ready.
       </p>
+      <pre style={{ fontSize: '0.8rem', color: '#94a3b8', background: '#1e293b', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        href: {typeof window !== 'undefined' ? window.location.href : ''}
+        pathname: {typeof window !== 'undefined' ? window.location.pathname : ''}
+        hash: {typeof window !== 'undefined' ? window.location.hash : ''}
+        search: {typeof window !== 'undefined' ? window.location.search : ''}
+      </pre>
       <button
         onClick={() => navigate('/')}
         style={{ padding: '0.6rem 1.4rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', marginRight: '0.75rem' }}

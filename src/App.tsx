@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
 import BuilderPage from './pages/BuilderPage';
@@ -7,6 +7,21 @@ import AccountPage from './pages/AccountPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
+
+function NotFoundPage() {
+  const location = useLocation();
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'monospace', background: '#0f172a', color: '#f1f5f9', minHeight: '100vh' }}>
+      <h1 style={{ fontSize: '3rem', color: '#f87171', marginBottom: '1rem' }}>ROUTE NOT FOUND</h1>
+      <pre style={{ fontSize: '1rem', background: '#1e293b', padding: '1.5rem', borderRadius: '8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        href:     {typeof window !== 'undefined' ? window.location.href : ''}
+        pathname: {location.pathname}
+        hash:     {typeof window !== 'undefined' ? window.location.hash : ''}
+        search:   {location.search}
+      </pre>
+    </div>
+  );
+}
 
 // Catches render errors so the app shows a message instead of a blank page.
 // React 18 unmounts the entire tree on uncaught render errors with no
@@ -59,6 +74,7 @@ export default function App() {
             <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
             <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </HashRouter>
       </AuthProvider>
