@@ -638,7 +638,8 @@ function PaySection({
         },
       });
 
-      const res = await fetch('https://api.aspenx.cloud/stripe/create-checkout-session', {
+      const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
+      const res = await fetch(`${apiBase}/stripe/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
