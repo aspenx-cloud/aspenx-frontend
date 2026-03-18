@@ -595,16 +595,19 @@ function PaySection({
     setError(null);
 
     try {
-      const payload: Record<string, unknown> = {
+      const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
+
+      // ── Step 1: Create order ─────────────────────────────────────────────
+      const orderPayload: Record<string, unknown> = {
         tier,
         region,
         selections: selections.map((s) => s.id),
         addons,
-        aspenxPrice: {
-          setupFee:   estimate.aspenx.setupFee,
-          monthlyFee: estimate.aspenx.monthlyFee,
+        pricing: {
+          setupFee:          estimate.aspenx.setupFee,
+          monthlyFee:        estimate.aspenx.monthlyFee,
+          awsEstimateMonthly: estimate.awsEstimate.monthly,
         },
-        awsEstimate: estimate.awsEstimate.monthly,
         userEmail: user.email,
         customer: {
           fullName:       customer.fullName.trim(),
@@ -613,11 +616,24 @@ function PaySection({
           taxId:          customer.taxId.trim(),
         },
       };
-      if (tier === 1) payload.awsAccountId = awsAccountId;
+      if (tier === 1) orderPayload.awsAccountId = awsAccountId;
 
-      // Save a local order record (includes state fields for restore/review)
+      const orderRes = await fetch(`${apiBase}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const orderData = await orderRes.json() as { ok: boolean; orderId?: string; error?: string };
+      if (!orderRes.ok || !orderData.ok) {
+        throw new Error(orderData.error ?? `Orders API responded ${orderRes.status}`);
+      }
+      const { orderId } = orderData;
+      if (!orderId) throw new Error('No orderId returned from orders API');
+
+      // ── Save local record for account page review ────────────────────────
       saveOrder({
-        id: crypto.randomUUID(),
+        id: orderId,
         tier,
         createdAt: new Date().toISOString(),
         estimate: {
@@ -638,16 +654,21 @@ function PaySection({
         },
       });
 
-      const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
-      const res = await fetch(`${apiBase}/stripe/create-checkout-session`, {
+      // ── Step 2: Create Stripe checkout session ───────────────────────────
+      const stripeRes = await fetch(`${apiBase}/stripe/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ orderId }),
       });
 
-      if (!res.ok) throw new Error(`Server responded ${res.status}`);
-      const { url } = (await res.json()) as { url: string };
-      window.location.href = url;
+      const stripeData = await stripeRes.json() as { ok: boolean; checkoutUrl?: string; error?: string };
+      if (!stripeRes.ok || !stripeData.ok) {
+        throw new Error(stripeData.error ?? `Stripe API responded ${stripeRes.status}`);
+      }
+      const { checkoutUrl } = stripeData;
+      if (!checkoutUrl) throw new Error('No checkoutUrl returned from Stripe API');
+
+      window.location.href = checkoutUrl;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(
