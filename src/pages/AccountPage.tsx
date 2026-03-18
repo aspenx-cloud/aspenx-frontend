@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { loadOrders, type Order } from '../lib/storage';
+import { loadOrders, deleteOrder, saveBuilderState, type Order } from '../lib/storage';
+import { RECIPE_ITEMS_BY_ID } from '../lib/mappings';
 import { formatUSD } from '../lib/pricing';
+import type { Tier, Region } from '../lib/types';
 
 const TIER_NAMES: Record<number, string> = {
   1: 'Deploy & Own',
@@ -17,9 +19,16 @@ const STATUS_STYLES: Record<Order['status'], string> = {
   complete:   'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
 };
 
+// Reconstruct full RecipeItem objects from stored IDs
+function restoreItems(ids: string[]) {
+  return ids.map((id) => RECIPE_ITEMS_BY_ID[id]).filter(Boolean);
+}
+
 export default function AccountPage() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+
+  const [orders, setOrders] = useState<Order[]>(() => loadOrders());
 
   // Redirect if not signed in
   useEffect(() => {
@@ -38,11 +47,39 @@ export default function AccountPage() {
 
   if (!user) return null;
 
-  const orders = loadOrders();
-
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  // Restore builder state from order, then navigate to builder for editing
+  const handleContinueOrder = (order: Order) => {
+    saveBuilderState({
+      tier: order.tier as Tier,
+      region: (order.region as Region) ?? 'us-east-1',
+      selections: restoreItems(order.selections),
+      addons: order.addons ?? { cicd: false, support: false },
+      awsAccountId: order.awsAccountId ?? '',
+    });
+    navigate(`/builder?tier=${order.tier}`);
+  };
+
+  // Restore builder state from order, then open checkout in read-only review mode
+  const handleReviewOrder = (order: Order) => {
+    saveBuilderState({
+      tier: order.tier as Tier,
+      region: (order.region as Region) ?? 'us-east-1',
+      selections: restoreItems(order.selections),
+      addons: order.addons ?? { cicd: false, support: false },
+      awsAccountId: order.awsAccountId ?? '',
+    });
+    navigate('/checkout?mode=review');
+  };
+
+  // Remove order from local storage and refresh list
+  const handleDeleteOrder = (id: string) => {
+    deleteOrder(id);
+    setOrders(loadOrders());
   };
 
   return (
@@ -112,7 +149,13 @@ export default function AccountPage() {
           ) : (
             <div className="space-y-3">
               {orders.map((order) => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onContinue={handleContinueOrder}
+                  onDelete={handleDeleteOrder}
+                  onReview={handleReviewOrder}
+                />
               ))}
             </div>
           )}
@@ -122,7 +165,14 @@ export default function AccountPage() {
   );
 }
 
-function OrderCard({ order }: { order: Order }) {
+interface OrderCardProps {
+  order: Order;
+  onContinue: (order: Order) => void;
+  onDelete: (id: string) => void;
+  onReview: (order: Order) => void;
+}
+
+function OrderCard({ order, onContinue, onDelete, onReview }: OrderCardProps) {
   const tierName = TIER_NAMES[order.tier] ?? `Tier ${order.tier}`;
   const statusStyle = STATUS_STYLES[order.status] ?? STATUS_STYLES.pending;
   const date = new Date(order.createdAt).toLocaleDateString('en-US', {
@@ -130,42 +180,82 @@ function OrderCard({ order }: { order: Order }) {
   });
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-          <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v4m0 0H5m4 0h6m6-4v4m0 0h-6m6 0v10a2 2 0 01-2 2h-4m-6 0H5a2 2 0 01-2-2V7" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-white">
-            Tier {order.tier} — {tierName}
-          </p>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Order #{order.id.slice(-8).toUpperCase()} · {date}
-          </p>
-          {order.selections.length > 0 && (
-            <p className="text-xs text-slate-600 mt-1">
-              {order.selections.length} recipe item{order.selections.length !== 1 ? 's' : ''}
+    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Left: info */}
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v4m0 0H5m4 0h6m6-4v4m0 0h-6m6 0v10a2 2 0 01-2 2h-4m-6 0H5a2 2 0 01-2-2V7" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">
+              Tier {order.tier} — {tierName}
             </p>
-          )}
+            <p className="text-xs text-slate-500 mt-0.5">
+              Order #{order.id.slice(-8).toUpperCase()} · {date}
+            </p>
+            {order.selections.length > 0 && (
+              <p className="text-xs text-slate-600 mt-1">
+                {order.selections.length} recipe item{order.selections.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: status + price */}
+        <div className="flex items-center gap-4 sm:flex-col sm:items-end">
+          <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${statusStyle}`}>
+            {order.status}
+          </span>
+          <div className="text-right">
+            {order.estimate.setupFee > 0 && (
+              <p className="text-sm font-bold text-cyan-400">{formatUSD(order.estimate.setupFee)} once</p>
+            )}
+            {order.estimate.monthlyFee > 0 && (
+              <p className="text-sm font-bold text-emerald-400">{formatUSD(order.estimate.monthlyFee)}/mo</p>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 sm:flex-col sm:items-end">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${statusStyle}`}>
-          {order.status}
-        </span>
-        <div className="text-right">
-          {order.estimate.setupFee > 0 && (
-            <p className="text-sm font-bold text-cyan-400">{formatUSD(order.estimate.setupFee)} once</p>
+      {/* Action buttons */}
+      {(order.status === 'pending' || order.status === 'complete') && (
+        <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-2">
+          {order.status === 'pending' && (
+            <>
+              <button
+                onClick={() => onContinue(order)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/10 text-cyan-400
+                  border border-cyan-500/20 hover:bg-cyan-500/20 transition-all
+                  focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                Continue editing
+              </button>
+              <button
+                onClick={() => onDelete(order.id)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-400
+                  border border-rose-500/20 hover:bg-rose-500/10 transition-all
+                  focus:outline-none focus:ring-2 focus:ring-rose-500"
+              >
+                Delete
+              </button>
+            </>
           )}
-          {order.estimate.monthlyFee > 0 && (
-            <p className="text-sm font-bold text-emerald-400">{formatUSD(order.estimate.monthlyFee)}/mo</p>
+          {order.status === 'complete' && (
+            <button
+              onClick={() => onReview(order)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300
+                border border-slate-700 bg-slate-800 hover:bg-slate-700 transition-all
+                focus:outline-none focus:ring-2 focus:ring-slate-500"
+            >
+              Review order
+            </button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

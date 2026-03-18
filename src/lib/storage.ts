@@ -41,12 +41,25 @@ export interface Order {
   estimate: { setupFee: number; monthlyFee: number; awsMonthly: number };
   selections: string[];
   status: 'pending' | 'processing' | 'complete';
+  // Optional: added for state restore (backward-compatible)
+  region?: string;
+  addons?: { cicd: boolean; support: boolean };
+  awsAccountId?: string;
 }
 
 export function saveOrder(order: Order): void {
   try {
     const orders = loadOrders();
     orders.unshift(order);
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+  } catch {
+    // ignore
+  }
+}
+
+export function deleteOrder(id: string): void {
+  try {
+    const orders = loadOrders().filter((o) => o.id !== id);
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
   } catch {
     // ignore

@@ -1,8 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loadBuilderState } from '../lib/storage';
 
 export default function CheckoutCancelPage() {
   const navigate = useNavigate();
+  const saved = loadBuilderState();
+  const savedTier = saved?.tier;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4 py-16 font-sans">
@@ -61,13 +64,17 @@ export default function CheckoutCancelPage() {
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => navigate('/#pricing')}
+              onClick={() =>
+                savedTier
+                  ? navigate(`/builder?tier=${savedTier}`)
+                  : navigate('/builder')
+              }
               className="flex-1 px-5 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-cyan-500 to-blue-600
                 hover:from-cyan-400 hover:to-blue-500 text-white transition-all duration-200
                 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30
                 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900"
             >
-              Back to Pricing
+              Back to Builder
             </button>
             <button
               onClick={() => navigate('/')}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { loadBuilderState, saveOrder } from '../lib/storage';
@@ -7,9 +7,8 @@ import { formatUSD, STARTS_FROM } from '../lib/pricing';
 import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
 import type { Tier, RecipeItem, Addon, Region, PriceEstimate } from '../lib/types';
-
-// Lazy-load the heavy diagram component
-const ArchitectureDiagram = lazy(() => import('../components/ArchitectureDiagram'));
+// Static import — avoids stale-chunk 404s after new deploys
+import ArchitectureDiagram from '../components/ArchitectureDiagram';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tier copy
@@ -81,6 +80,8 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reviewMode = searchParams.get('mode') === 'review';
   const { user, signInWithGoogle, firebaseReady } = useAuth();
 
   // ── Load persisted builder state ────────────────────────────────────────
@@ -271,15 +272,7 @@ export default function CheckoutPage() {
           {/* ── D. Architecture diagram ─────────────────────────────────── */}
           <Card>
             <SectionHeading>Architecture diagram</SectionHeading>
-            <Suspense
-              fallback={
-                <div className="h-64 flex items-center justify-center">
-                  <div className="w-6 h-6 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
-                </div>
-              }
-            >
-              <ArchitectureDiagram plan={plan} />
-            </Suspense>
+            <ArchitectureDiagram plan={plan} />
           </Card>
 
           {/* ── E. Deployment plan BOM ──────────────────────────────────── */}
@@ -336,21 +329,54 @@ export default function CheckoutPage() {
             </ol>
           </Card>
 
-          {/* ── H. Pay button ────────────────────────────────────────────── */}
-          <PaySection
-            tier={tier}
-            region={region}
-            selections={selections}
-            addons={addons}
-            awsAccountId={awsAccountId}
-            estimate={estimate}
-            user={user}
-            firebaseReady={firebaseReady}
-            signInWithGoogle={signInWithGoogle}
-          />
+          {/* ── H. Pay / Review ──────────────────────────────────────────── */}
+          {reviewMode ? (
+            <ReviewBanner onBack={() => navigate('/account')} />
+          ) : (
+            <PaySection
+              tier={tier}
+              region={region}
+              selections={selections}
+              addons={addons}
+              awsAccountId={awsAccountId}
+              estimate={estimate}
+              user={user}
+              firebaseReady={firebaseReady}
+              signInWithGoogle={signInWithGoogle}
+            />
+          )}
         </div>
       </main>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Review banner (shown instead of PaySection when mode=review)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewBanner({ onBack }: { onBack: () => void }) {
+  return (
+    <Card className="border-slate-700 bg-slate-900/40">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1">
+            Read-only review
+          </p>
+          <p className="text-sm text-slate-400">
+            This is a review of your completed order. No payment action is available.
+          </p>
+        </div>
+        <button
+          onClick={onBack}
+          className="flex-shrink-0 px-5 py-2.5 rounded-xl font-semibold text-sm border border-slate-700
+            text-slate-300 hover:text-white hover:border-slate-500 hover:bg-slate-800/40
+            transition-all focus:outline-none focus:ring-2 focus:ring-slate-500"
+        >
+          ← Back to account
+        </button>
+      </div>
+    </Card>
   );
 }
 
@@ -531,7 +557,7 @@ function PaySection({
       };
       if (tier === 1) payload.awsAccountId = awsAccountId;
 
-      // Save a local order record
+      // Save a local order record (includes state fields for restore/review)
       saveOrder({
         id: crypto.randomUUID(),
         tier,
@@ -543,6 +569,9 @@ function PaySection({
         },
         selections: selections.map((s) => s.id),
         status: 'pending',
+        region,
+        addons,
+        awsAccountId: tier === 1 ? awsAccountId : undefined,
       });
 
       const res = await fetch('https://api.aspenx.cloud/stripe/create-checkout-session', {

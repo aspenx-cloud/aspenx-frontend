@@ -1,4 +1,4 @@
-import type { Topic } from './types';
+import type { Topic, RecipeItem } from './types';
 
 export const TOPICS: Topic[] = [
   {
@@ -199,3 +199,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   reliability: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5',
   ops: 'text-rose-400 border-rose-500/30 bg-rose-500/5',
 };
+
+// Flat lookup map: RecipeItem ID → RecipeItem
+export const RECIPE_ITEMS_BY_ID: Record<string, RecipeItem> = Object.fromEntries(
+  TOPICS.flatMap((t) => t.items).map((item) => [item.id, item]),
+);
