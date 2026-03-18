@@ -1,4 +1,4 @@
-import type { BuilderState } from './types';
+import type { BuilderState, CustomerDetails } from './types';
 
 // Bump version key when shape changes to avoid stale data
 const BUILDER_KEY = 'aspenx_builder_v2';
@@ -45,6 +45,7 @@ export interface Order {
   region?: string;
   addons?: { cicd: boolean; support: boolean };
   awsAccountId?: string;
+  customer?: CustomerDetails;
 }
 
 export function saveOrder(order: Order): void {

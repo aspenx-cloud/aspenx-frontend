@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { loadBuilderState, saveOrder } from '../lib/storage';
+import { loadBuilderState, saveBuilderState, saveOrder } from '../lib/storage';
 import { formatUSD, STARTS_FROM } from '../lib/pricing';
 import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
-import type { Tier, RecipeItem, Addon, Region, PriceEstimate } from '../lib/types';
+import type { Tier, RecipeItem, Addon, Region, PriceEstimate, CustomerDetails } from '../lib/types';
 // Static import — avoids stale-chunk 404s after new deploys
 import ArchitectureDiagram from '../components/ArchitectureDiagram';
 
@@ -91,6 +91,16 @@ export default function CheckoutPage() {
   const selections: RecipeItem[] = saved?.selections ?? [];
   const addons: Addon            = saved?.addons ?? { cicd: false, support: false };
   const awsAccountId             = saved?.awsAccountId ?? '';
+
+  // ── Customer billing details (editable on checkout, persisted to localStorage) ──
+  const [customer, setCustomer] = useState<CustomerDetails>(() =>
+    saved?.customer ?? { fullName: '', companyName: '', billingCountry: '', taxId: '' }
+  );
+
+  useEffect(() => {
+    if (!tier || selections.length === 0) return;
+    saveBuilderState({ tier, region, selections, addons, awsAccountId, customer });
+  }, [customer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Redirect if no state ────────────────────────────────────────────────
   useEffect(() => {
@@ -329,7 +339,44 @@ export default function CheckoutPage() {
             </ol>
           </Card>
 
-          {/* ── H. Pay / Review ──────────────────────────────────────────── */}
+          {/* ── H. Customer details ──────────────────────────────────────── */}
+          {reviewMode ? (
+            (customer.fullName || customer.billingCountry) ? (
+              <Card>
+                <SectionHeading>Customer details</SectionHeading>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {customer.fullName && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Full name</p>
+                      <p className="text-sm font-medium text-white">{customer.fullName}</p>
+                    </div>
+                  )}
+                  {customer.companyName && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Company</p>
+                      <p className="text-sm font-medium text-white">{customer.companyName}</p>
+                    </div>
+                  )}
+                  {customer.billingCountry && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Billing country</p>
+                      <p className="text-sm font-medium text-white">{customer.billingCountry}</p>
+                    </div>
+                  )}
+                  {customer.taxId && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-0.5">Tax ID / VAT</p>
+                      <p className="text-sm font-medium text-white">{customer.taxId}</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ) : null
+          ) : (
+            <CustomerDetailsCard customer={customer} onChange={setCustomer} />
+          )}
+
+          {/* ── I. Pay / Review ──────────────────────────────────────────── */}
           {reviewMode ? (
             <ReviewBanner onBack={() => navigate('/account')} />
           ) : (
@@ -340,6 +387,7 @@ export default function CheckoutPage() {
               addons={addons}
               awsAccountId={awsAccountId}
               estimate={estimate}
+              customer={customer}
               user={user}
               firebaseReady={firebaseReady}
               signInWithGoogle={signInWithGoogle}
@@ -391,6 +439,7 @@ interface PaySectionProps {
   addons: Addon;
   awsAccountId: string;
   estimate: PriceEstimate;
+  customer: CustomerDetails;
   user: { email: string | null } | null;
   firebaseReady: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -522,6 +571,7 @@ function PaySection({
   addons,
   awsAccountId,
   estimate,
+  customer,
   user,
   firebaseReady,
   signInWithGoogle,
@@ -530,6 +580,8 @@ function PaySection({
   const [error, setError]       = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
 
+  const customerValid = customer.fullName.trim().length > 0 && customer.billingCountry.trim().length > 0;
+
   const handleSignIn = async () => {
     setSigningIn(true);
     try { await signInWithGoogle(); } catch { /* handled in context */ }
@@ -537,7 +589,7 @@ function PaySection({
   };
 
   const handlePay = async () => {
-    if (!user) return;
+    if (!user || !customerValid) return;
 
     setLoading(true);
     setError(null);
@@ -554,6 +606,12 @@ function PaySection({
         },
         awsEstimate: estimate.awsEstimate.monthly,
         userEmail: user.email,
+        customer: {
+          fullName:       customer.fullName.trim(),
+          companyName:    customer.companyName.trim(),
+          billingCountry: customer.billingCountry.trim(),
+          taxId:          customer.taxId.trim(),
+        },
       };
       if (tier === 1) payload.awsAccountId = awsAccountId;
 
@@ -572,6 +630,12 @@ function PaySection({
         region,
         addons,
         awsAccountId: tier === 1 ? awsAccountId : undefined,
+        customer: {
+          fullName:       customer.fullName.trim(),
+          companyName:    customer.companyName.trim(),
+          billingCountry: customer.billingCountry.trim(),
+          taxId:          customer.taxId.trim(),
+        },
       });
 
       const res = await fetch('https://api.aspenx.cloud/stripe/create-checkout-session', {
@@ -653,9 +717,14 @@ function PaySection({
           <p className="text-xs text-slate-500">
             Signed in as <span className="text-slate-300">{user.email}</span>
           </p>
+          {!customerValid && (
+            <p className="text-xs text-amber-400">
+              Complete the customer details above to continue.
+            </p>
+          )}
           <button
             onClick={handlePay}
-            disabled={loading}
+            disabled={loading || !customerValid}
             className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm
               bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500
               text-white transition-all focus:outline-none focus:ring-2 focus:ring-cyan-500
@@ -684,6 +753,96 @@ function PaySection({
           </p>
         </div>
       )}
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Customer details form card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CustomerDetailsCard({
+  customer,
+  onChange,
+}: {
+  customer: CustomerDetails;
+  onChange: (c: CustomerDetails) => void;
+}) {
+  const set = (field: keyof CustomerDetails) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    onChange({ ...customer, [field]: e.target.value });
+
+  const inputClass = (required: boolean, val: string) =>
+    `w-full bg-slate-800 border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600
+     focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all
+     ${required && val.trim() === '' ? 'border-slate-700' : 'border-slate-700'}`;
+
+  return (
+    <Card>
+      <SectionHeading>Customer details</SectionHeading>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Full name */}
+        <div>
+          <label htmlFor="customer-fullname" className="block text-xs font-medium text-slate-400 mb-1">
+            Full name <span className="text-red-400">*</span>
+          </label>
+          <input
+            id="customer-fullname"
+            type="text"
+            value={customer.fullName}
+            onChange={set('fullName')}
+            placeholder="Jane Smith"
+            className={inputClass(true, customer.fullName)}
+          />
+        </div>
+
+        {/* Company name */}
+        <div>
+          <label htmlFor="customer-company" className="block text-xs font-medium text-slate-400 mb-1">
+            Company <span className="text-slate-600">(optional)</span>
+          </label>
+          <input
+            id="customer-company"
+            type="text"
+            value={customer.companyName}
+            onChange={set('companyName')}
+            placeholder="Acme Corp"
+            className={inputClass(false, customer.companyName)}
+          />
+        </div>
+
+        {/* Billing country */}
+        <div>
+          <label htmlFor="customer-country" className="block text-xs font-medium text-slate-400 mb-1">
+            Billing country <span className="text-red-400">*</span>
+          </label>
+          <input
+            id="customer-country"
+            type="text"
+            value={customer.billingCountry}
+            onChange={set('billingCountry')}
+            placeholder="United States"
+            className={inputClass(true, customer.billingCountry)}
+          />
+        </div>
+
+        {/* Tax ID */}
+        <div>
+          <label htmlFor="customer-taxid" className="block text-xs font-medium text-slate-400 mb-1">
+            Tax ID / VAT <span className="text-slate-600">(optional)</span>
+          </label>
+          <input
+            id="customer-taxid"
+            type="text"
+            value={customer.taxId}
+            onChange={set('taxId')}
+            placeholder="EU123456789"
+            className={inputClass(false, customer.taxId)}
+          />
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-600 mt-3">
+        Required fields: full name and billing country. Used for your order record only — no invoice is generated at this stage.
+      </p>
     </Card>
   );
 }

@@ -60,6 +60,7 @@ export default function AccountPage() {
       selections: restoreItems(order.selections),
       addons: order.addons ?? { cicd: false, support: false },
       awsAccountId: order.awsAccountId ?? '',
+      customer: order.customer,
     });
     navigate(`/builder?tier=${order.tier}`);
   };
@@ -72,6 +73,7 @@ export default function AccountPage() {
       selections: restoreItems(order.selections),
       addons: order.addons ?? { cicd: false, support: false },
       awsAccountId: order.awsAccountId ?? '',
+      customer: order.customer,
     });
     navigate('/checkout?mode=review');
   };

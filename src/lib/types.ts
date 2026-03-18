@@ -47,12 +47,20 @@ export interface Addon {
   support: boolean;
 }
 
+export interface CustomerDetails {
+  fullName: string;
+  companyName: string;
+  billingCountry: string;
+  taxId: string;
+}
+
 export interface BuilderState {
   tier: Tier | null;
   region: Region;
   selections: RecipeItem[];
   addons: Addon;
   awsAccountId: string;
+  customer?: CustomerDetails;
 }
 
 /** A single line in the AspenX fee breakdown */
