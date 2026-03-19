@@ -60,7 +60,13 @@ export async function fetchBackendOrders(
 
     // Client-side filter: only show orders belonging to the signed-in user.
     // TODO: remove once GET /orders is user-scoped on the backend.
-    return all.filter((o) => o.userEmail?.toLowerCase() === userEmail.toLowerCase());
+    return all
+      .filter((o) => o.userEmail?.toLowerCase() === userEmail.toLowerCase())
+      .map((o) => ({
+        ...o,
+        selections: Array.isArray(o.selections) ? o.selections : [],
+        estimate: o.estimate ?? { setupFee: 0, monthlyFee: 0, awsMonthly: 0 },
+      }));
   } catch {
     return [];
   }

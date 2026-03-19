@@ -438,9 +438,9 @@ function LocalDraftCard({ order, onContinue, onDelete }: LocalDraftCardProps) {
             <p className="text-xs text-slate-600 mt-0.5">
               Draft · {date}
             </p>
-            {order.selections.length > 0 && (
+            {(order.selections ?? []).length > 0 && (
               <p className="text-xs text-slate-600 mt-1">
-                {order.selections.length} recipe item{order.selections.length !== 1 ? 's' : ''}
+                {(order.selections ?? []).length} recipe item{(order.selections ?? []).length !== 1 ? 's' : ''}
               </p>
             )}
           </div>
