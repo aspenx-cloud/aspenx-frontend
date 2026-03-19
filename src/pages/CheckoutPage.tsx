@@ -103,13 +103,14 @@ export default function CheckoutPage() {
   }, [customer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Redirect if no state ────────────────────────────────────────────────
+  // In review mode a paid order may have no selections stored — only require tier.
   useEffect(() => {
-    if (!tier || selections.length === 0) {
-      navigate('/builder', { replace: true });
-    }
-  }, [tier, selections.length, navigate]);
+    const missing = reviewMode ? !tier : (!tier || selections.length === 0);
+    if (missing) navigate('/builder', { replace: true });
+  }, [reviewMode, tier, selections.length, navigate]);
 
-  if (!tier || selections.length === 0) return null;
+  if (!tier) return null;
+  if (!reviewMode && selections.length === 0) return null;
 
   const plan = buildDeploymentPlan(tier, selections, addons, region);
   const estimate = plan.estimate;
