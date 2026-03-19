@@ -1,4 +1,5 @@
 import React, { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import TierCards from '../components/TierCard';
 
@@ -348,7 +349,7 @@ function Footer() {
       <div style={{ textAlign: 'center', padding: '4px 0', fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>
         BUILD MARKER: d1539bd
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" alt="AspenX logo" className="w-6 h-6" />
@@ -361,6 +362,11 @@ function Footer() {
           <p className="text-xs text-slate-700">
             © {new Date().getFullYear()} AspenX.cloud
           </p>
+        </div>
+        <div className="flex justify-center gap-6 text-xs text-slate-600">
+          <Link to="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-slate-400 transition-colors">Terms of Service</Link>
+          <Link to="/refund-policy" className="hover:text-slate-400 transition-colors">Refund Policy</Link>
         </div>
       </div>
     </footer>

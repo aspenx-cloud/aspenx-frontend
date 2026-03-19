@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
-import { loadBuilderState, saveBuilderState, saveOrder } from '../lib/storage';
+import { loadBuilderState, saveBuilderState, saveOrder, saveRecentOrderId } from '../lib/storage';
 import { formatUSD, STARTS_FROM } from '../lib/pricing';
 import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
@@ -642,6 +642,9 @@ function PaySection({
       }
       const { orderId } = orderData;
       if (!orderId) throw new Error('No orderId returned from orders API');
+
+      // ── Persist orderId so success page can fetch real order state ────────
+      saveRecentOrderId(orderId);
 
       // ── Save local record for account page review ────────────────────────
       saveOrder({

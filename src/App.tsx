@@ -7,6 +7,9 @@ import AccountPage from './pages/AccountPage';
 import CheckoutPage from './pages/CheckoutPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCancelPage from './pages/CheckoutCancelPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import RefundPolicyPage from './pages/RefundPolicyPage';
 
 function NotFoundPage() {
   const location = useLocation();
@@ -74,6 +77,9 @@ export default function App() {
             <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
             <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/refund-policy" element={<RefundPolicyPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </HashRouter>

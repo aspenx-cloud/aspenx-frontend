@@ -3,6 +3,7 @@ import type { BuilderState, CustomerDetails } from './types';
 // Bump version key when shape changes to avoid stale data
 const BUILDER_KEY = 'aspenx_builder_v2';
 const ORDERS_KEY = 'aspenx_orders_v1';
+const RECENT_ORDER_KEY = 'aspenx_recent_order_v1';
 
 // ─── Builder State ────────────────────────────────────────────────────────────
 
@@ -74,5 +75,32 @@ export function loadOrders(): Order[] {
     return JSON.parse(raw) as Order[];
   } catch {
     return [];
+  }
+}
+
+// ─── Recent Order (for success page lookup) ────────────────────────────────────
+
+/** Persist the most recent orderId so the success page can fetch real order state. */
+export function saveRecentOrderId(orderId: string): void {
+  try {
+    localStorage.setItem(RECENT_ORDER_KEY, orderId);
+  } catch {
+    // ignore
+  }
+}
+
+export function loadRecentOrderId(): string | null {
+  try {
+    return localStorage.getItem(RECENT_ORDER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function clearRecentOrderId(): void {
+  try {
+    localStorage.removeItem(RECENT_ORDER_KEY);
+  } catch {
+    // ignore
   }
 }

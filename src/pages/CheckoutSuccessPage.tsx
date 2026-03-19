@@ -1,10 +1,61 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { loadRecentOrderId, clearRecentOrderId } from '../lib/storage';
+import { fetchBackendOrder, type BackendOrder, type ProvisioningStatus } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
+
+const PROV_LABELS: Record<ProvisioningStatus, string> = {
+  not_started: 'Provisioning not started',
+  queued:      'Queued for provisioning',
+  in_progress: 'Provisioning in progress',
+  completed:   'Provisioning completed',
+  failed:      'Provisioning failed',
+};
+
+const PROV_STYLES: Record<ProvisioningStatus, string> = {
+  not_started: 'text-slate-400 bg-slate-700/30 border-slate-700',
+  queued:      'text-amber-400 bg-amber-400/10 border-amber-400/20',
+  in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+  completed:   'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+  failed:      'text-rose-400 bg-rose-400/10 border-rose-400/20',
+};
 
 export default function CheckoutSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
   const sessionId = searchParams.get('session_id');
+
+  const [order, setOrder] = useState<BackendOrder | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+
+  useEffect(() => {
+    const orderId = loadRecentOrderId();
+    if (!orderId) return;
+
+    let cancelled = false;
+    setOrderLoading(true);
+
+    const load = async () => {
+      try {
+        const idToken = user ? await user.getIdToken() : undefined;
+        const result = await fetchBackendOrder(orderId, idToken);
+        if (!cancelled) {
+          setOrder(result);
+          // Clear so it doesn't persist across future sessions
+          if (result) clearRecentOrderId();
+        }
+      } catch {
+        // Degrade gracefully — success UI still shows
+      } finally {
+        if (!cancelled) setOrderLoading(false);
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4 py-16 font-sans">
@@ -41,6 +92,41 @@ export default function CheckoutSuccessPage() {
             We received your payment and your environment is queued for provisioning.
             You'll receive a confirmation email shortly.
           </p>
+
+          {/* Real order status (when available) */}
+          {(orderLoading || order) && (
+            <div className="mb-6 rounded-xl border border-slate-800 bg-slate-800/30 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">
+                Order status
+              </p>
+              {orderLoading && (
+                <div className="flex items-center gap-2 text-slate-500 text-sm">
+                  <span className="w-4 h-4 rounded-full border-2 border-slate-500 border-t-slate-300 animate-spin flex-shrink-0" />
+                  Fetching order details…
+                </div>
+              )}
+              {order && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border text-emerald-400 bg-emerald-400/10 border-emerald-400/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    {order.status === 'paid' ? 'Paid' : order.status}
+                  </span>
+                  {order.provisioningStatus && (
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${PROV_STYLES[order.provisioningStatus]}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      {PROV_LABELS[order.provisioningStatus]}
+                    </span>
+                  )}
+                  {!order.provisioningStatus && (
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${PROV_STYLES.not_started}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                      {PROV_LABELS.not_started}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* What happens next */}
           <div className="mb-8">
@@ -102,14 +188,21 @@ export default function CheckoutSuccessPage() {
         </div>
 
         {/* Technical details */}
-        {sessionId && (
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/40 px-5 py-3">
+        {(sessionId || order?.orderId) && (
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/40 px-5 py-3 space-y-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 mb-1">
               Technical details
             </p>
-            <p className="text-xs text-slate-500 font-mono break-all">
-              session_id: {sessionId}
-            </p>
+            {order?.orderId && (
+              <p className="text-xs text-slate-500 font-mono break-all">
+                order_id: {order.orderId}
+              </p>
+            )}
+            {sessionId && (
+              <p className="text-xs text-slate-500 font-mono break-all">
+                session_id: {sessionId}
+              </p>
+            )}
           </div>
         )}
       </div>
