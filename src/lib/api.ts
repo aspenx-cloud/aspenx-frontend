@@ -24,6 +24,8 @@ export interface BackendOrder {
   createdAt: string;
   selections: string[];
   estimate: { setupFee: number; monthlyFee: number; awsMonthly: number };
+  /** Email of the user who placed this order — stored at order creation time. */
+  userEmail?: string;
   customer?: CustomerDetails;
   addons?: { cicd: boolean; support: boolean };
   awsAccountId?: string;
@@ -31,16 +33,34 @@ export interface BackendOrder {
 
 // ─── Fetch helpers ─────────────────────────────────────────────────────────────
 
-/** Fetch all orders for the authenticated user.
- *  Passes Firebase ID token as Bearer; returns [] on any error. */
-export async function fetchBackendOrders(idToken: string): Promise<BackendOrder[]> {
+/**
+ * Fetch orders from the backend.
+ *
+ * TEMPORARY MVP LIMITATION: GET /orders is not yet user-scoped on the backend
+ * and returns all orders across all users. Until server-side filtering is
+ * implemented, we apply a client-side email filter so users only see their own
+ * orders. This assumes the backend stores `userEmail` on each order record
+ * (it is sent in the POST /orders payload). Orders without a `userEmail` field
+ * are excluded to avoid showing unrelated records.
+ *
+ * When the backend adds proper user scoping, remove the `userEmail` param and
+ * the client-side filter below.
+ */
+export async function fetchBackendOrders(
+  idToken: string,
+  userEmail: string,
+): Promise<BackendOrder[]> {
   try {
     const res = await fetch(`${API_BASE}/orders`, {
       headers: { Authorization: `Bearer ${idToken}` },
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return Array.isArray(data) ? data : (data.orders ?? []);
+    const all: BackendOrder[] = Array.isArray(data) ? data : (data.orders ?? []);
+
+    // Client-side filter: only show orders belonging to the signed-in user.
+    // TODO: remove once GET /orders is user-scoped on the backend.
+    return all.filter((o) => o.userEmail?.toLowerCase() === userEmail.toLowerCase());
   } catch {
     return [];
   }

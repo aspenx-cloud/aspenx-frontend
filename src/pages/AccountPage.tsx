@@ -86,7 +86,8 @@ export default function AccountPage() {
       setBackendError(null);
       try {
         const token = await user.getIdToken();
-        const orders = await fetchBackendOrders(token);
+        const email = user.email ?? '';
+        const orders = await fetchBackendOrders(token, email);
         if (!cancelled) setBackendOrders(orders);
       } catch {
         if (!cancelled) setBackendError('Could not load orders from server.');
