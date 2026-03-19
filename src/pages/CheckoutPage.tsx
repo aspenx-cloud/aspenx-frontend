@@ -387,6 +387,7 @@ export default function CheckoutPage() {
               addons={addons}
               awsAccountId={awsAccountId}
               estimate={estimate}
+              deploymentPlan={plan}
               customer={customer}
               user={user}
               firebaseReady={firebaseReady}
@@ -439,6 +440,7 @@ interface PaySectionProps {
   addons: Addon;
   awsAccountId: string;
   estimate: PriceEstimate;
+  deploymentPlan: DeploymentPlan;
   customer: CustomerDetails;
   user: { email: string | null } | null;
   firebaseReady: boolean;
@@ -571,6 +573,7 @@ function PaySection({
   addons,
   awsAccountId,
   estimate,
+  deploymentPlan,
   customer,
   user,
   firebaseReady,
@@ -603,10 +606,16 @@ function PaySection({
         region,
         selections: selections.map((s) => s.id),
         addons,
+        deploymentPlan,
         pricing: {
-          setupFee:          estimate.aspenx.setupFee,
-          monthlyFee:        estimate.aspenx.monthlyFee,
-          awsEstimateMonthly: estimate.awsEstimate.monthly,
+          aspenx: {
+            setupFee:   estimate.aspenx.setupFee,
+            monthlyFee: estimate.aspenx.monthlyFee,
+          },
+          awsEstimate: {
+            monthly: estimate.awsEstimate.monthly,
+          },
+          currency: 'USD',
         },
         userEmail: user.email,
         customer: {
@@ -624,9 +633,12 @@ function PaySection({
         body: JSON.stringify(orderPayload),
       });
 
-      const orderData = await orderRes.json() as { ok: boolean; orderId?: string; error?: string };
+      const orderData = await orderRes.json() as { ok: boolean; orderId?: string; error?: string; missing?: string[] };
       if (!orderRes.ok || !orderData.ok) {
-        throw new Error(orderData.error ?? `Orders API responded ${orderRes.status}`);
+        const detail = orderData.missing?.length
+          ? `${orderData.error ?? 'Order failed'} — missing: ${orderData.missing.join(', ')}`
+          : (orderData.error ?? `Orders API responded ${orderRes.status}`);
+        throw new Error(detail);
       }
       const { orderId } = orderData;
       if (!orderId) throw new Error('No orderId returned from orders API');
