@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import type { User } from 'firebase/auth';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { loadBuilderState, saveBuilderState, saveOrder, saveRecentOrderId } from '../lib/storage';
@@ -443,7 +444,7 @@ interface PaySectionProps {
   estimate: PriceEstimate;
   deploymentPlan: DeploymentPlan;
   customer: CustomerDetails;
-  user: { email: string | null } | null;
+  user: User | null;
   firebaseReady: boolean;
   signInWithGoogle: () => Promise<void>;
 }
@@ -601,6 +602,13 @@ function PaySection({
     try {
       const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
 
+      let idToken: string;
+      try {
+        idToken = await user.getIdToken();
+      } catch {
+        throw new Error('You must be signed in to place an order. Please sign in and try again.');
+      }
+
       // ── Step 1: Create order ─────────────────────────────────────────────
       const orderPayload: Record<string, unknown> = {
         tier,
@@ -630,7 +638,10 @@ function PaySection({
 
       const orderRes = await fetch(`${apiBase}/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify(orderPayload),
       });
 
