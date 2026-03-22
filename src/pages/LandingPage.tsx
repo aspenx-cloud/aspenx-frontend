@@ -346,27 +346,25 @@ function ContactSection() {
 function Footer() {
   return (
     <footer className="border-t border-slate-800 bg-slate-950 py-10">
-      <div style={{ textAlign: 'center', padding: '4px 0', fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' }}>
-        BUILD MARKER: d1539bd
-      </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" alt="AspenX logo" className="w-6 h-6" />
             <span className="text-sm font-semibold text-slate-400">AspenX.cloud</span>
           </div>
-          <p className="text-xs text-slate-600 text-center max-w-lg">
+          <p className="text-xs text-slate-500 text-center max-w-lg">
             AspenX.cloud is an independent DevOps services company. All price estimates are indicative and subject to a formal scoping review.
             AWS is a registered trademark of Amazon Web Services, Inc. AspenX is not affiliated with or endorsed by AWS.
           </p>
-          <p className="text-xs text-slate-700">
+          <p className="text-xs text-slate-500">
             © {new Date().getFullYear()} AspenX.cloud
           </p>
         </div>
-        <div className="flex justify-center gap-6 text-xs text-slate-600">
-          <Link to="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
-          <Link to="/terms" className="hover:text-slate-400 transition-colors">Terms of Service</Link>
-          <Link to="/refund-policy" className="hover:text-slate-400 transition-colors">Refund Policy</Link>
+        <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-500">
+          <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+          <Link to="/refund-policy" className="hover:text-slate-300 transition-colors">Refund Policy</Link>
+          <Link to="/support" className="hover:text-slate-300 transition-colors">Contact &amp; Support</Link>
         </div>
       </div>
     </footer>

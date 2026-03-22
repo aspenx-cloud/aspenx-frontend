@@ -21,7 +21,7 @@ export default function TermsOfServicePage() {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <p className="text-xs font-semibold uppercase tracking-widest text-cyan-500 mb-2">Legal</p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Terms of Service</h1>
-        <p className="text-slate-500 text-sm mb-10">Last updated: March 2025</p>
+        <p className="text-slate-500 text-sm mb-10">Last updated: March 2026</p>
 
         <div className="prose prose-invert prose-sm max-w-none space-y-8 text-slate-300 leading-relaxed">
 
@@ -83,8 +83,10 @@ export default function TermsOfServicePage() {
             <h2 className="text-lg font-bold text-white mb-3">5. Service delivery</h2>
             <p>
               AspenX will use commercially reasonable efforts to provision services within a reasonable
-              timeframe after payment. Provisioning timelines are estimates and may vary based on
-              complexity and workload. AspenX will communicate delays via email.
+              timeframe after payment. Service delivery may involve manual, operator-assisted steps —
+              AspenX is not a fully automated platform. Provisioning timelines are estimates and may
+              vary based on configuration complexity and current workload. AspenX will communicate
+              status and any delays via email.
             </p>
           </section>
 

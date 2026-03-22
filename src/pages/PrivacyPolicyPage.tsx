@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <p className="text-xs font-semibold uppercase tracking-widest text-cyan-500 mb-2">Legal</p>
         <h1 className="text-4xl font-extrabold text-white mb-2">Privacy Policy</h1>
-        <p className="text-slate-500 text-sm mb-10">Last updated: March 2025</p>
+        <p className="text-slate-500 text-sm mb-10">Last updated: March 2026</p>
 
         <div className="prose prose-invert prose-sm max-w-none space-y-8 text-slate-300 leading-relaxed">
 
@@ -155,11 +155,12 @@ export function PolicyFooter() {
   return (
     <footer className="border-t border-slate-800 mt-16 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-xs text-slate-700">© {new Date().getFullYear()} AspenX.cloud</p>
-        <div className="flex gap-5 text-xs text-slate-600">
-          <Link to="/privacy" className="hover:text-slate-400 transition-colors">Privacy Policy</Link>
-          <Link to="/terms" className="hover:text-slate-400 transition-colors">Terms of Service</Link>
-          <Link to="/refund-policy" className="hover:text-slate-400 transition-colors">Refund Policy</Link>
+        <p className="text-xs text-slate-500">© {new Date().getFullYear()} AspenX.cloud</p>
+        <div className="flex flex-wrap justify-center gap-5 text-xs text-slate-500">
+          <Link to="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+          <Link to="/refund-policy" className="hover:text-slate-300 transition-colors">Refund Policy</Link>
+          <Link to="/support" className="hover:text-slate-300 transition-colors">Contact &amp; Support</Link>
         </div>
       </div>
     </footer>

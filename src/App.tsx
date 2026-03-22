@@ -10,6 +10,7 @@ import CheckoutCancelPage from './pages/CheckoutCancelPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import RefundPolicyPage from './pages/RefundPolicyPage';
+import SupportPage from './pages/SupportPage';
 
 function NotFoundPage() {
   const location = useLocation();
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/refund-policy" element={<RefundPolicyPage />} />
+            <Route path="/support" element={<SupportPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </HashRouter>
