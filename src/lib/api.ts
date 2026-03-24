@@ -2,7 +2,7 @@ import type { CustomerDetails } from './types';
 
 export const API_BASE =
   import.meta.env.VITE_API_BASE_URL ??
-  'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
+  'https://api.aspenx.cloud';
 
 // ─── Backend order types ───────────────────────────────────────────────────────
 

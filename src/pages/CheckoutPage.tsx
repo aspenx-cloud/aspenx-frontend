@@ -4,6 +4,7 @@ import type { User } from 'firebase/auth';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../contexts/AuthContext';
 import { loadBuilderState, saveBuilderState, saveOrder, saveRecentOrderId } from '../lib/storage';
+import { API_BASE } from '../lib/api';
 import { formatUSD, STARTS_FROM } from '../lib/pricing';
 import { buildDeploymentPlan, CATEGORY_META, type DeploymentPlan } from '../lib/plan';
 import { REGIONS } from '../lib/types';
@@ -600,8 +601,6 @@ function PaySection({
     setError(null);
 
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://vq2d5twmbk.execute-api.us-east-1.amazonaws.com';
-
       let idToken: string;
       try {
         idToken = await user.getIdToken();
@@ -636,7 +635,7 @@ function PaySection({
       };
       if (tier === 1) orderPayload.awsAccountId = awsAccountId;
 
-      const orderRes = await fetch(`${apiBase}/orders`, {
+      const orderRes = await fetch(`${API_BASE}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -682,7 +681,7 @@ function PaySection({
       });
 
       // ── Step 2: Create Stripe checkout session ───────────────────────────
-      const stripeRes = await fetch(`${apiBase}/stripe/create-checkout-session`, {
+      const stripeRes = await fetch(`${API_BASE}/stripe/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
