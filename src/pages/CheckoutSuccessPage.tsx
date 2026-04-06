@@ -176,6 +176,15 @@ export default function CheckoutSuccessPage() {
               Back to Home
             </button>
             <button
+              onClick={() => navigate('/account')}
+              className="flex-1 px-5 py-3 rounded-xl font-semibold text-sm border border-slate-700
+                text-slate-300 hover:text-white hover:border-slate-500 hover:bg-slate-800/40
+                transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              Manage Order
+            </button>
+            <button
               onClick={() => navigate('/builder')}
               className="flex-1 px-5 py-3 rounded-xl font-semibold text-sm border border-slate-700
                 text-slate-300 hover:text-white hover:border-slate-500 hover:bg-slate-800/40
