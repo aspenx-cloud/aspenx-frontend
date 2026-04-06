@@ -70,7 +70,6 @@ const MONTHLY_FEE_PER_POINT: Record<Tier, number> = { 1: 0,  2: 25, 3: 0  };
 // ADD-ONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CICD_ADDON_SETUP    = 250; // one-time, all tiers
 const SUPPORT_ADDON_MONTHLY = 200; // monthly, Tier 2 only
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,11 +154,6 @@ export function calculateEstimate(
   // ── 3. Add-ons ────────────────────────────────────────────────────────────
   let setupFee   = setupBase;
   let monthlyFee = monthlyBase;
-
-  if (addons.cicd) {
-    setupFee += CICD_ADDON_SETUP;
-    breakdown.push({ label: 'CI/CD pipeline add-on', amount: CICD_ADDON_SETUP, isSetup: true });
-  }
 
   if (addons.support && tier === 2) {
     monthlyFee += SUPPORT_ADDON_MONTHLY;

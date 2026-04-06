@@ -60,6 +60,8 @@ export interface BuilderState {
   selections: RecipeItem[];
   addons: Addon;
   awsAccountId: string;
+  /** Tier 3 only — IaC format the customer wants delivered */
+  iacFormat?: 'terraform' | 'cloudformation';
   customer?: CustomerDetails;
 }
 

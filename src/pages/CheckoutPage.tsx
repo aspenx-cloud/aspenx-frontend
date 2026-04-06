@@ -20,9 +20,9 @@ const TIER_NEXT_STEPS: Record<Tier, { title: string; items: string[] }> = {
   1: {
     title: 'What happens after payment',
     items: [
-      'You will receive a bootstrap script to run in your AWS account.',
-      'The script creates a deployment IAM role — AspenX never touches your root credentials.',
-      'AspenX deploys your recipe into your account via the cross-account role.',
+      'AspenX will provide a CloudFormation bootstrap template after checkout.',
+      'Deploy the template in your AWS account to create a cross-account IAM role.',
+      'AspenX deploys your recipe into your account via that role — root credentials are never required.',
       'You pay AWS directly for all usage — no markup from AspenX.',
     ],
   },
@@ -38,10 +38,10 @@ const TIER_NEXT_STEPS: Record<Tier, { title: string; items: string[] }> = {
   3: {
     title: 'What happens after payment',
     items: [
-      'You will receive a production-ready Terraform module for your recipe.',
+      'You will receive production-ready IaC code for your recipe in your chosen format.',
       'A step-by-step deployment guide is included.',
-      'You run terraform apply in your own AWS account.',
-      'You own the result — and pay AWS directly for usage.',
+      'You deploy in your own AWS account — you own the result.',
+      'You pay AWS directly for all usage — no markup from AspenX.',
     ],
   },
 };
@@ -49,7 +49,7 @@ const TIER_NEXT_STEPS: Record<Tier, { title: string; items: string[] }> = {
 const TIER_NAMES: Record<Tier, string> = {
   1: 'Deploy into your AWS account',
   2: 'Managed DevOps',
-  3: 'Terraform Kit',
+  3: 'IaC Kit',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,6 +93,7 @@ export default function CheckoutPage() {
   const selections: RecipeItem[] = saved?.selections ?? [];
   const addons: Addon            = saved?.addons ?? { cicd: false, support: false };
   const awsAccountId             = saved?.awsAccountId ?? '';
+  const iacFormat                = saved?.iacFormat ?? 'terraform';
 
   // ── Customer billing details (editable on checkout, persisted to localStorage) ──
   const [customer, setCustomer] = useState<CustomerDetails>(() =>
@@ -175,21 +176,24 @@ export default function CheckoutPage() {
             </div>
 
             {/* Add-ons */}
-            {(addons.cicd || addons.support) && (
+            {(addons.support && tier === 2) && (
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <p className="text-xs text-slate-500 mb-2">Add-ons</p>
                 <div className="flex flex-wrap gap-2">
-                  {addons.cicd && (
-                    <span className="px-2.5 py-1 rounded-full text-xs border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
-                      CI/CD pipeline
-                    </span>
-                  )}
-                  {addons.support && tier === 2 && (
-                    <span className="px-2.5 py-1 rounded-full text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                      Support & infra changes
-                    </span>
-                  )}
+                  <span className="px-2.5 py-1 rounded-full text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                    Monthly support (+$200/mo)
+                  </span>
                 </div>
+              </div>
+            )}
+
+            {/* Tier 3 IaC format */}
+            {tier === 3 && (
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <p className="text-xs text-slate-500 mb-1">IaC format</p>
+                <span className="px-2.5 py-1 rounded-full text-xs border border-purple-500/30 bg-purple-500/10 text-purple-300">
+                  {iacFormat === 'terraform' ? 'Terraform' : 'CloudFormation'}
+                </span>
               </div>
             )}
 
@@ -389,6 +393,7 @@ export default function CheckoutPage() {
               selections={selections}
               addons={addons}
               awsAccountId={awsAccountId}
+              iacFormat={iacFormat}
               estimate={estimate}
               deploymentPlan={plan}
               customer={customer}
@@ -442,6 +447,7 @@ interface PaySectionProps {
   selections: RecipeItem[];
   addons: Addon;
   awsAccountId: string;
+  iacFormat: 'terraform' | 'cloudformation';
   estimate: PriceEstimate;
   deploymentPlan: DeploymentPlan;
   customer: CustomerDetails;
@@ -575,6 +581,7 @@ function PaySection({
   selections,
   addons,
   awsAccountId,
+  iacFormat,
   estimate,
   deploymentPlan,
   customer,
@@ -634,6 +641,7 @@ function PaySection({
         },
       };
       if (tier === 1) orderPayload.awsAccountId = awsAccountId;
+      if (tier === 3) orderPayload.iacFormat = iacFormat;
 
       const orderRes = await fetch(`${API_BASE}/orders`, {
         method: 'POST',

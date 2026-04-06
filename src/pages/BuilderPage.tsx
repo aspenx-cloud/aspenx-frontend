@@ -73,13 +73,18 @@ export default function BuilderPage() {
   });
   const [awsConfirmed, setAwsConfirmed] = useState(false);
 
-  // Tier 3 optional field
+  // Tier 3 optional fields
   const [existingAccountOptional, setExistingAccountOptional] = useState('');
+  const [iacFormat, setIacFormat] = useState<'terraform' | 'cloudformation'>(() => {
+    const saved = loadBuilderState();
+    if (saved && saved.tier === tier && saved.iacFormat) return saved.iacFormat;
+    return 'terraform';
+  });
 
   // Persist to localStorage whenever relevant state changes
   useEffect(() => {
-    saveBuilderState({ tier, region, selections, addons, awsAccountId });
-  }, [tier, region, selections, addons, awsAccountId]);
+    saveBuilderState({ tier, region, selections, addons, awsAccountId, iacFormat });
+  }, [tier, region, selections, addons, awsAccountId, iacFormat]);
 
   // ── DnD state ────────────────────────────────────────────────────────────
   const [activeItem, setActiveItem] = useState<RecipeItem | null>(null);
@@ -108,6 +113,7 @@ export default function BuilderPage() {
   const clearAll = useCallback(() => {
     setSelections([]);
     setAddons({ cicd: false, support: false });
+    setIacFormat('terraform');
     clearBuilderState();
   }, []);
 
@@ -152,7 +158,7 @@ export default function BuilderPage() {
             {([
               { t: 1 as Tier, name: 'Deploy into your AWS account', note: 'One-time payment', sub: 'You own the AWS account' },
               { t: 2 as Tier, name: 'Managed DevOps',               note: 'Monthly subscription', sub: 'AspenX manages the account' },
-              { t: 3 as Tier, name: 'Terraform Kit',                note: 'One-time payment', sub: 'You deploy, you own' },
+              { t: 3 as Tier, name: 'IaC Kit',                      note: 'One-time payment', sub: 'You deploy, you own' },
             ]).map(({ t, name, note, sub }) => (
               <button
                 key={t}
@@ -185,7 +191,7 @@ export default function BuilderPage() {
   const TIER_SHORT: Record<Tier, string> = {
     1: 'Deploy into your AWS account',
     2: 'Managed DevOps',
-    3: 'Terraform Kit',
+    3: 'IaC Kit',
   };
 
   return (
@@ -314,6 +320,8 @@ export default function BuilderPage() {
                 onAwsConfirmedChange={setAwsConfirmed}
                 existingAccountOptional={existingAccountOptional}
                 onExistingAccountOptionalChange={setExistingAccountOptional}
+                iacFormat={iacFormat}
+                onIacFormatChange={setIacFormat}
                 onRemoveItem={removeItem}
                 onToggleAddon={toggleAddon}
                 onClear={clearAll}

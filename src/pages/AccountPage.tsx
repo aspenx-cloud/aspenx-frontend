@@ -11,7 +11,7 @@ import type { Tier, Region } from '../lib/types';
 const TIER_NAMES: Record<number, string> = {
   1: 'Deploy & Own',
   2: 'Managed Cloud',
-  3: 'Terraform Kit',
+  3: 'IaC Kit',
 };
 
 // ─── Status helpers ────────────────────────────────────────────────────────────

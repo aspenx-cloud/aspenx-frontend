@@ -6,15 +6,15 @@ import EstimateBox from './EstimateBox';
 const TIER_DESCRIPTIONS: Record<Tier, { title: string; desc: string }> = {
   1: {
     title: 'Deploy into your AWS account',
-    desc: 'One-time deployment. You own the AWS account, you pay AWS directly. AspenX deploys via a cross-account IAM role you create with our bootstrap script.',
+    desc: 'One-time deployment. You own the AWS account, you pay AWS directly. AspenX deploys via a cross-account IAM role you create with a CloudFormation bootstrap template we provide after checkout.',
   },
   2: {
     title: 'Managed DevOps',
     desc: 'AspenX provisions and manages the AWS account under AspenX billing. AWS costs are included in your monthly subscription. You get limited-access IAM roles.',
   },
   3: {
-    title: 'Terraform Kit',
-    desc: 'You deploy; you pay AWS directly. AspenX delivers production-ready Terraform code + step-by-step instructions for your existing AWS account.',
+    title: 'IaC Kit',
+    desc: 'You deploy; you pay AWS directly. AspenX delivers production-ready IaC code (Terraform or CloudFormation) + step-by-step instructions for your existing AWS account.',
   },
 };
 
@@ -47,6 +47,8 @@ interface SummaryPanelProps {
   onAwsConfirmedChange: (v: boolean) => void;
   existingAccountOptional: string;
   onExistingAccountOptionalChange: (v: string) => void;
+  iacFormat: 'terraform' | 'cloudformation';
+  onIacFormatChange: (v: 'terraform' | 'cloudformation') => void;
   onRemoveItem: (id: string) => void;
   onToggleAddon: (key: keyof Addon) => void;
   onClear: () => void;
@@ -67,6 +69,8 @@ export default function SummaryPanel({
   onAwsConfirmedChange,
   existingAccountOptional,
   onExistingAccountOptionalChange,
+  iacFormat,
+  onIacFormatChange,
   onRemoveItem,
   onToggleAddon,
   onClear,
@@ -182,20 +186,12 @@ export default function SummaryPanel({
 
           {/* Bootstrap instructions */}
           <div className="rounded-lg border border-slate-700 bg-slate-900 p-3">
-            <p className="text-xs font-semibold text-slate-300 mb-1.5">Bootstrap instructions</p>
-            <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
-              Before deployment, you'll need to run a one-time bootstrap script in your AWS account.
-              This creates an IAM role that allows AspenX to deploy into your account securely,
-              without ever having access to your root credentials.
+            <p className="text-xs font-semibold text-slate-300 mb-1.5">Bootstrap setup</p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              After checkout, AspenX will provide a CloudFormation bootstrap template.
+              Deploy it in your AWS account to create a cross-account IAM role — AspenX
+              uses this role to deploy into your account without ever touching your root credentials.
             </p>
-            <div className="rounded border border-slate-700 bg-slate-800/60 px-3 py-2">
-              <p className="text-[10px] text-slate-500 mb-1 font-semibold uppercase tracking-wider">
-                Bootstrap script — coming next
-              </p>
-              <code className="text-[11px] text-slate-400 font-mono">
-                # Script will be provided after checkout
-              </code>
-            </div>
           </div>
         </div>
       )}
@@ -213,16 +209,40 @@ export default function SummaryPanel({
         </div>
       )}
 
-      {/* ── Tier 3 optional field ─────────────────────────────────────────── */}
+      {/* ── Tier 3 optional fields ────────────────────────────────────────── */}
       {tier === 3 && (
         <div className="rounded-xl border border-purple-500/15 bg-purple-500/5 p-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-widest text-purple-400">
             Your deployment
           </p>
           <p className="text-xs text-slate-400 leading-relaxed">
-            You deploy; you pay AWS directly. AspenX delivers production-ready Terraform code
+            You deploy; you pay AWS directly. AspenX delivers production-ready IaC code
             and step-by-step instructions.
           </p>
+
+          {/* IaC format selector */}
+          <div>
+            <p className="text-xs font-medium text-slate-400 mb-1.5">
+              IaC format <span className="text-red-400">*</span>
+            </p>
+            <div className="flex gap-2">
+              {(['terraform', 'cloudformation'] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => onIacFormatChange(fmt)}
+                  className={`flex-1 py-2 px-3 rounded-lg border text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    iacFormat === fmt
+                      ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600 hover:text-slate-300'
+                  }`}
+                >
+                  {fmt === 'terraform' ? 'Terraform' : 'CloudFormation'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label htmlFor="existing-account" className="block text-xs font-medium text-slate-400 mb-1">
               Existing AWS Account ID <span className="text-slate-600">(optional)</span>
@@ -239,7 +259,7 @@ export default function SummaryPanel({
                 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all font-mono"
             />
             <p className="text-[10px] text-slate-600 mt-1">
-              Helps us tailor the Terraform output. Leave blank if you'll create a new account.
+              Helps us tailor the IaC output. Leave blank if you'll create a new account.
             </p>
           </div>
         </div>
@@ -301,9 +321,9 @@ export default function SummaryPanel({
         </div>
       </div>
 
-      {/* Add-ons */}
-      {tier && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 space-y-3">
+      {/* Add-ons — Tier 2 only (support) */}
+      {tier === 2 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
             Add-ons
           </h3>
@@ -312,12 +332,12 @@ export default function SummaryPanel({
             <div className="relative mt-0.5">
               <input
                 type="checkbox"
-                checked={addons.cicd}
-                onChange={() => onToggleAddon('cicd')}
+                checked={addons.support}
+                onChange={() => onToggleAddon('support')}
                 className="sr-only peer"
               />
-              <div className="w-4 h-4 rounded border border-slate-600 bg-slate-800 peer-checked:bg-cyan-500 peer-checked:border-cyan-500 transition-all flex items-center justify-center">
-                {addons.cicd && (
+              <div className="w-4 h-4 rounded border border-slate-600 bg-slate-800 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all flex items-center justify-center">
+                {addons.support && (
                   <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -326,39 +346,15 @@ export default function SummaryPanel({
             </div>
             <div>
               <p className="text-sm text-slate-300 group-hover:text-white transition-colors">
-                CI/CD setup
+                Monthly support <span className="text-emerald-400 font-medium">+$200/mo</span>
               </p>
-              <p className="text-xs text-slate-500">
-                {tier === 3 ? 'Pipeline template + docs (one-time)' : 'Automated deploy pipeline (one-time)'}
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Up to 2 hrs/mo of minor infra changes, fixes, or technical guidance by a senior DevOps engineer.
+                Response within 1 business day; standard requests completed within 3 business days.
+                Larger changes quoted separately.
               </p>
             </div>
           </label>
-
-          {tier === 2 && (
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <div className="relative mt-0.5">
-                <input
-                  type="checkbox"
-                  checked={addons.support}
-                  onChange={() => onToggleAddon('support')}
-                  className="sr-only peer"
-                />
-                <div className="w-4 h-4 rounded border border-slate-600 bg-slate-800 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-all flex items-center justify-center">
-                  {addons.support && (
-                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-slate-300 group-hover:text-white transition-colors">
-                  Support & infra changes
-                </p>
-                <p className="text-xs text-slate-500">Monthly changes, updates, and support (monthly)</p>
-              </div>
-            </label>
-          )}
         </div>
       )}
 
