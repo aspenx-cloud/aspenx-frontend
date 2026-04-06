@@ -8,7 +8,6 @@ const PROV_LABELS: Record<ProvisioningStatus, string> = {
   not_started: 'Provisioning not started',
   queued:      'Queued for provisioning',
   in_progress: 'Provisioning in progress',
-  in_review:   'Under review',
   completed:   'Provisioning completed',
   failed:      'Provisioning failed',
 };
@@ -17,7 +16,6 @@ const PROV_STYLES: Record<ProvisioningStatus, string> = {
   not_started: 'text-slate-400 bg-slate-700/30 border-slate-700',
   queued:      'text-amber-400 bg-amber-400/10 border-amber-400/20',
   in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-  in_review:   'text-violet-400 bg-violet-400/10 border-violet-400/20',
   completed:   'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
   failed:      'text-rose-400 bg-rose-400/10 border-rose-400/20',
 };
