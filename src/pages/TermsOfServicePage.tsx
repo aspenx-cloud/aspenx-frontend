@@ -83,10 +83,11 @@ export default function TermsOfServicePage() {
             <h2 className="text-lg font-bold text-white mb-3">5. Service delivery</h2>
             <p>
               AspenX will use commercially reasonable efforts to provision services within a reasonable
-              timeframe after payment. Service delivery may involve manual, operator-assisted steps —
-              AspenX is not a fully automated platform. Provisioning timelines are estimates and may
-              vary based on configuration complexity and current workload. AspenX will communicate
-              status and any delays via email.
+              timeframe after payment. Service delivery involves manual, operator-assisted steps —
+              AspenX is not a fully automated platform. Orders are typically completed within 24 hours
+              of payment confirmation, assuming no issues with the order configuration or components.
+              You can track your order status at any time in your account at aspenx.cloud. AspenX will
+              communicate any material delays or issues via email.
             </p>
           </section>
 

@@ -29,9 +29,9 @@ export default function RefundPolicyPage() {
             <h2 className="text-lg font-bold text-white mb-3">Overview</h2>
             <p>
               AspenX.cloud provides professional services that involve scoping, provisioning, and
-              configuring AWS infrastructure on your behalf. Because work begins promptly after
-              payment and involves real engineering effort, our refund policy reflects the nature
-              of service delivery.
+              configuring AWS infrastructure on your behalf. Provisioning is operator-assisted and
+              typically begins within one business day of payment confirmation. Because real
+              engineering effort is involved, our refund policy reflects the nature of service delivery.
             </p>
           </section>
 
@@ -48,8 +48,8 @@ export default function RefundPolicyPage() {
               </li>
               <li>
                 <strong className="text-slate-200">After provisioning has started:</strong> Setup fees
-                are non-refundable once provisioning work has commenced. We will notify you when
-                provisioning begins.
+                are non-refundable once provisioning work has commenced. You can track your order
+                status at any time in your account at aspenx.cloud.
               </li>
             </ul>
           </section>

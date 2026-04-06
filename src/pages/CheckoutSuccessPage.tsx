@@ -8,6 +8,7 @@ const PROV_LABELS: Record<ProvisioningStatus, string> = {
   not_started: 'Provisioning not started',
   queued:      'Queued for provisioning',
   in_progress: 'Provisioning in progress',
+  in_review:   'Under review',
   completed:   'Provisioning completed',
   failed:      'Provisioning failed',
 };
@@ -16,6 +17,7 @@ const PROV_STYLES: Record<ProvisioningStatus, string> = {
   not_started: 'text-slate-400 bg-slate-700/30 border-slate-700',
   queued:      'text-amber-400 bg-amber-400/10 border-amber-400/20',
   in_progress: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+  in_review:   'text-violet-400 bg-violet-400/10 border-violet-400/20',
   completed:   'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
   failed:      'text-rose-400 bg-rose-400/10 border-rose-400/20',
 };
@@ -90,7 +92,7 @@ export default function CheckoutSuccessPage() {
           </h1>
           <p className="text-slate-400 text-center text-sm mb-8 leading-relaxed">
             We received your payment and your environment is queued for provisioning.
-            You'll receive a confirmation email shortly.
+            A confirmation email has been sent to your registered address.
           </p>
 
           {/* Real order status (when available) */}
@@ -138,17 +140,17 @@ export default function CheckoutSuccessPage() {
                 {
                   step: '01',
                   title: 'Order received',
-                  desc: 'Your payment has been processed and your order details are recorded.',
+                  desc: 'Your payment has been processed and your order details are recorded. A confirmation email has been sent.',
                 },
                 {
                   step: '02',
-                  title: 'Infrastructure provisioning',
-                  desc: 'Our team begins setting up your tailored AWS environment based on your selected plan.',
+                  title: 'Operator provisioning',
+                  desc: 'Our team reviews and sets up your AWS environment. This is a manual, operator-assisted process — typically completed within 24 hours.',
                 },
                 {
                   step: '03',
                   title: 'Handoff & access',
-                  desc: "You'll receive credentials and documentation to access your new environment.",
+                  desc: "You'll receive an email when your environment is ready, along with credentials and documentation.",
                 },
               ].map(({ step, title, desc }) => (
                 <li key={step} className="flex gap-4">

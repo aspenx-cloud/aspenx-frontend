@@ -12,6 +12,7 @@ export type ProvisioningStatus =
   | 'not_started'
   | 'queued'
   | 'in_progress'
+  | 'in_review'
   | 'completed'
   | 'failed';
 
