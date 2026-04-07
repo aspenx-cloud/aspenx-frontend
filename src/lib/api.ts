@@ -29,6 +29,8 @@ export interface BackendOrder {
   customer?: CustomerDetails;
   addons?: { cicd: boolean; support: boolean };
   awsAccountId?: string;
+  /** Tier 3 only — IaC format chosen at order time. */
+  iacFormat?: 'terraform' | 'cloudformation';
 }
 
 // ─── Fetch helpers ─────────────────────────────────────────────────────────────

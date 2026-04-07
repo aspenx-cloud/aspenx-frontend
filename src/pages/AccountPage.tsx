@@ -147,6 +147,7 @@ export default function AccountPage() {
       selections: restoreItems(order.selections),
       addons: order.addons ?? { cicd: false, support: false },
       awsAccountId: order.awsAccountId ?? '',
+      iacFormat: order.iacFormat ?? 'terraform',
       customer: order.customer,
     });
     navigate('/checkout?mode=review');
