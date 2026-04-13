@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { loadOrders, deleteOrder, saveBuilderState, type Order } from '../lib/storage';
 import { RECIPE_ITEMS_BY_ID } from '../lib/mappings';
 import { formatUSD } from '../lib/pricing';
-import { fetchBackendOrders, type BackendOrder, type ProvisioningStatus, API_BASE } from '../lib/api';
+import { fetchBackendOrders, downloadBootstrapTemplate, verifyBootstrap, type BackendOrder, type ProvisioningStatus, API_BASE } from '../lib/api';
 import type { Tier, Region } from '../lib/types';
 
 const TIER_NAMES: Record<number, string> = {
@@ -68,6 +68,12 @@ export default function AccountPage() {
 
   // Retry-checkout loading state keyed by orderId
   const [retrying, setRetrying] = useState<string | null>(null);
+
+  // Bootstrap template download loading state keyed by orderId
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  // Bootstrap verification loading state keyed by orderId
+  const [verifying, setVerifying] = useState<string | null>(null);
 
   // Redirect if not signed in
   useEffect(() => {
@@ -151,6 +157,40 @@ export default function AccountPage() {
       customer: order.customer,
     });
     navigate('/checkout?mode=review');
+  };
+
+  const handleDownloadBootstrap = async (order: BackendOrder) => {
+    if (!user) return;
+    setDownloading(order.orderId);
+    try {
+      const token = await user.getIdToken();
+      await downloadBootstrapTemplate(order.orderId, token);
+    } catch (err) {
+      alert(`Could not download bootstrap template: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleVerifyBootstrap = async (order: BackendOrder) => {
+    if (!user) return;
+    setVerifying(order.orderId);
+    try {
+      const token = await user.getIdToken();
+      const { bootstrapVerifiedAt } = await verifyBootstrap(order.orderId, token);
+      // Update local state so the card transitions to verified without a full reload.
+      setBackendOrders((prev) =>
+        prev.map((o) =>
+          o.orderId === order.orderId
+            ? { ...o, bootstrapStatus: 'verified', bootstrapVerifiedAt }
+            : o
+        )
+      );
+    } catch (err) {
+      alert(`Setup verification failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setVerifying(null);
+    }
   };
 
   const handleRetryCheckout = async (order: BackendOrder) => {
@@ -262,8 +302,12 @@ export default function AccountPage() {
                   key={order.orderId}
                   order={order}
                   retrying={retrying === order.orderId}
+                  downloading={downloading === order.orderId}
+                  verifying={verifying === order.orderId}
                   onReview={handleReviewBackendOrder}
                   onRetryCheckout={handleRetryCheckout}
+                  onDownloadBootstrap={handleDownloadBootstrap}
+                  onVerifyBootstrap={handleVerifyBootstrap}
                 />
               ))}
             </div>
@@ -301,11 +345,15 @@ export default function AccountPage() {
 interface BackendOrderCardProps {
   order: BackendOrder;
   retrying: boolean;
+  downloading: boolean;
+  verifying: boolean;
   onReview: (order: BackendOrder) => void;
   onRetryCheckout: (order: BackendOrder) => void;
+  onDownloadBootstrap: (order: BackendOrder) => void;
+  onVerifyBootstrap: (order: BackendOrder) => void;
 }
 
-function BackendOrderCard({ order, retrying, onReview, onRetryCheckout }: BackendOrderCardProps) {
+function BackendOrderCard({ order, retrying, downloading, verifying, onReview, onRetryCheckout, onDownloadBootstrap, onVerifyBootstrap }: BackendOrderCardProps) {
   const tierName = TIER_NAMES[order.tier] ?? `Tier ${order.tier}`;
   const statusStyle = BACKEND_STATUS_STYLES[order.status] ?? BACKEND_STATUS_STYLES.pending_payment;
   const statusLabel = BACKEND_STATUS_LABEL[order.status] ?? order.status;
@@ -360,6 +408,57 @@ function BackendOrderCard({ order, retrying, onReview, onRetryCheckout }: Backen
         </div>
       </div>
 
+      {/* Tier 1 bootstrap panel — shown only for paid Tier 1 orders */}
+      {order.tier === 1 && order.status === 'paid' && (
+        <>
+          {order.bootstrapStatus === 'verified' ? (
+            // Verified state
+            <div className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-start gap-3">
+              <svg className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-xs font-semibold text-emerald-400">AWS setup verified</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  AspenX has confirmed access to your AWS account. Our team will begin
+                  deploying your infrastructure and will be in touch shortly.
+                </p>
+                {order.bootstrapVerifiedAt && (
+                  <p className="text-xs text-slate-600 mt-1">
+                    Verified {new Date(order.bootstrapVerifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            // Not yet verified — show setup instructions
+            <div className="mt-4 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-4 py-3">
+              <p className="text-xs font-semibold text-cyan-400 mb-1">Action required — AWS account setup</p>
+              {order.bootstrapStatus === 'generated' ? (
+                <>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Download the CloudFormation bootstrap template and deploy it in your AWS account.
+                    It creates a cross-account role AspenX uses to deploy your infrastructure —
+                    no root credentials required. Once deployed, click{' '}
+                    <span className="text-slate-300 font-medium">Verify My Setup</span>{' '}
+                    below. AspenX will not begin deployment until verification is complete.
+                  </p>
+                  {order.bootstrapGeneratedAt && (
+                    <p className="text-xs text-slate-600 mt-1.5">
+                      Template ready · generated {new Date(order.bootstrapGeneratedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-amber-400/70">
+                  Template generating — check back shortly or contact support@aspenx.cloud
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
       {/* Action buttons */}
       <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-2">
         {order.status === 'paid' && (
@@ -371,6 +470,30 @@ function BackendOrderCard({ order, retrying, onReview, onRetryCheckout }: Backen
           >
             Review order
           </button>
+        )}
+        {order.tier === 1 && order.status === 'paid' && order.bootstrapStatus === 'generated' && (
+          <>
+            <button
+              onClick={() => onDownloadBootstrap(order)}
+              disabled={downloading}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500/10 text-cyan-400
+                border border-cyan-500/20 hover:bg-cyan-500/20 transition-all
+                disabled:opacity-50 disabled:cursor-not-allowed
+                focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              {downloading ? 'Downloading…' : 'Download Bootstrap Template'}
+            </button>
+            <button
+              onClick={() => onVerifyBootstrap(order)}
+              disabled={verifying}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400
+                border border-emerald-500/20 hover:bg-emerald-500/20 transition-all
+                disabled:opacity-50 disabled:cursor-not-allowed
+                focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {verifying ? 'Verifying…' : 'Verify My Setup'}
+            </button>
+          </>
         )}
         {order.status === 'pending_payment' && (
           <button
