@@ -354,6 +354,8 @@ interface BackendOrderCardProps {
 }
 
 function BackendOrderCard({ order, retrying, downloading, verifying, onReview, onRetryCheckout, onDownloadBootstrap, onVerifyBootstrap }: BackendOrderCardProps) {
+  const [showInstructions, setShowInstructions] = useState(false);
+
   const tierName = TIER_NAMES[order.tier] ?? `Tier ${order.tier}`;
   const statusStyle = BACKEND_STATUS_STYLES[order.status] ?? BACKEND_STATUS_STYLES.pending_payment;
   const statusLabel = BACKEND_STATUS_LABEL[order.status] ?? order.status;
@@ -484,6 +486,14 @@ function BackendOrderCard({ order, retrying, downloading, verifying, onReview, o
               {downloading ? 'Downloading…' : 'Download Bootstrap Template'}
             </button>
             <button
+              onClick={() => setShowInstructions(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300
+                border border-slate-700 bg-slate-800 hover:bg-slate-700 transition-all
+                focus:outline-none focus:ring-2 focus:ring-slate-500"
+            >
+              Instructions
+            </button>
+            <button
               onClick={() => onVerifyBootstrap(order)}
               disabled={verifying}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-400
@@ -495,6 +505,7 @@ function BackendOrderCard({ order, retrying, downloading, verifying, onReview, o
             </button>
           </>
         )}
+        {showInstructions && <BootstrapInstructionsModal onClose={() => setShowInstructions(false)} />}
         {order.status === 'pending_payment' && (
           <button
             onClick={() => onRetryCheckout(order)}
@@ -507,6 +518,69 @@ function BackendOrderCard({ order, retrying, downloading, verifying, onReview, o
             {retrying ? 'Redirecting…' : 'Complete payment'}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Bootstrap Instructions Modal ─────────────────────────────────────────────
+
+function BootstrapInstructionsModal({ onClose }: { onClose: () => void }) {
+  const steps = [
+    'Sign in to the AWS account you entered for this order.',
+    'Open CloudFormation in the AWS Console.',
+    'Click Create stack.',
+    'Keep "Choose an existing template" selected.',
+    'Select "Upload a template file".',
+    'Upload the bootstrap template you downloaded from AspenX.',
+    'Click Next.',
+    'Continue through the steps and click Create stack.',
+    'Wait until the stack status changes to CREATE_COMPLETE.',
+    'Return here and click Verify My Setup.',
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
+          <h2 className="text-sm font-semibold text-white">How to use the bootstrap template</h2>
+          <button
+            onClick={onClose}
+            className="ml-4 text-slate-500 hover:text-slate-300 transition-colors flex-shrink-0
+              focus:outline-none focus:ring-2 focus:ring-slate-500 rounded"
+            aria-label="Close"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Steps */}
+        <ol className="space-y-2.5">
+          {steps.map((step, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30
+                text-cyan-400 text-xs font-semibold flex items-center justify-center mt-px">
+                {i + 1}
+              </span>
+              <p className="text-xs text-slate-300 leading-relaxed">{step}</p>
+            </li>
+          ))}
+        </ol>
+
+        {/* Note */}
+        <p className="mt-5 text-xs text-slate-500 leading-relaxed border-t border-slate-800 pt-4">
+          If stack creation fails, open the <span className="text-slate-400">Events</span> tab
+          in CloudFormation for the error details, fix the issue, and try again.
+        </p>
       </div>
     </div>
   );
