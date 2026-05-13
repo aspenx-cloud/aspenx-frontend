@@ -8,5 +8,8 @@
 terraform.tfvars
 *.auto.tfvars
 
-# Plan output files
+# Plan output files (binary and JSON — may contain sensitive variable values)
 *.tfplan
+tfplan
+tfplan.json
+tfplan.txt
