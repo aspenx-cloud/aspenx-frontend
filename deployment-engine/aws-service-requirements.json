@@ -1,0 +1,391 @@
+{
+  "catalog_version": "1.1",
+  "generated_date": "2026-05-11",
+  "description": "AspenX deployment preflight catalog. Maps Terraform resource types to required AWS IAM actions, service-linked-role (SLR) requirements, taggability, and cost-safety rules. Update this file whenever new resource types are added to any AspenX stack.",
+  "sources": {
+    "iam_actions": "https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html",
+    "slr_guide": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_aws-services-that-work-with-iam.html",
+    "rds_slr": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAM.ServiceLinkedRole.html"
+  },
+
+  "_comment_required_aspenx_tags": "null means the key must be present with any non-empty value. A string value means the tag must match exactly that value.",
+  "required_aspenx_tags": {
+    "ManagedBy":         "AspenX",
+    "Project":           "AspenX",
+    "OrderId":           null,
+    "CustomerAccountId": null,
+    "AspenXTier":        null,
+    "AspenXRegion":      null,
+    "AspenXStack":       null,
+    "Environment":       "customer",
+    "Owner":             "customer",
+    "CreatedBy":         "AspenX"
+  },
+
+  "_comment_forbidden_iam_patterns": "Patterns checked against the Action field of Allow statements in the bootstrap policy. action_pattern supports exact match or prefix-wildcard (e.g. 'iam:*').",
+  "forbidden_iam_patterns": [
+    {
+      "action_pattern": "*",
+      "severity": "FAIL",
+      "reason": "Bare wildcard grants full AWS access. Never permitted in AspenXDeployRole."
+    },
+    {
+      "action_pattern": "iam:*",
+      "severity": "FAIL",
+      "reason": "Broad IAM grant. Only iam:CreateServiceLinkedRole with iam:AWSServiceName condition is permitted."
+    },
+    {
+      "action_pattern": "sts:*",
+      "severity": "FAIL",
+      "reason": "Broad STS grant. AspenXDeployRole must not issue tokens or assume arbitrary roles."
+    },
+    {
+      "action_pattern": "sts:AssumeRole",
+      "severity": "FAIL",
+      "reason": "Role chaining without Condition enables privilege escalation. Only permitted with a strict ExternalId condition and only in the trust policy, not the permission policy."
+    }
+  ],
+
+  "_comment_high_cost_resource_types": "Resource types whose mere presence in a plan is a cost violation for prototype/Tier-1 stacks.",
+  "high_cost_resource_types": {
+    "aws_nat_gateway": {
+      "severity": "FAIL",
+      "reason": "NAT Gateway: ~$32/month base + $0.045/GB data transfer. Prohibited in Tier 1 prototype stacks. Use public subnets with publicly_accessible=false on RDS instead."
+    },
+    "aws_eks_cluster": {
+      "severity": "FAIL",
+      "reason": "EKS control plane: ~$73/month. Not in Tier 1 prototype spec."
+    },
+    "aws_opensearch_domain": {
+      "severity": "FAIL",
+      "reason": "OpenSearch: expensive data-node cost. Not in Tier 1 prototype spec."
+    },
+    "aws_elasticsearch_domain": {
+      "severity": "FAIL",
+      "reason": "Elasticsearch (legacy alias for OpenSearch): expensive. Not in Tier 1 prototype spec."
+    },
+    "aws_redshift_cluster": {
+      "severity": "FAIL",
+      "reason": "Redshift: minimum ~$180/month for smallest node. Not in Tier 1 prototype spec."
+    },
+    "aws_elasticache_replication_group": {
+      "severity": "WARN",
+      "reason": "ElastiCache replication group: HA cache cluster cost. Not in Tier 1 prototype spec."
+    }
+  },
+
+  "_comment_high_cost_attribute_checks": "Per-resource attribute checks for cost violations (e.g. multi_az=true on RDS).",
+  "high_cost_attribute_checks": {
+    "aws_db_instance": {
+      "multi_az": {
+        "forbidden_value": true,
+        "severity": "FAIL",
+        "reason": "multi_az=true doubles RDS instance cost. Forbidden in Tier 1 prototype stacks."
+      },
+      "instance_class_key": "instance_class",
+      "instance_class_severity": "FAIL",
+      "forbidden_instance_class_prefixes": [
+        "db.r5", "db.r6g", "db.r6i", "db.r7g",
+        "db.m5", "db.m6g", "db.m6i", "db.m7g",
+        "db.x1", "db.x2g", "db.z1d"
+      ],
+      "allowed_instance_class_prefixes": ["db.t3", "db.t4g"]
+    }
+  },
+
+  "resource_types": {
+
+    "random_id": {
+      "service": "none",
+      "taggable": false,
+      "required_iam_actions": [],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Terraform-only provider resource. No AWS API calls."
+    },
+
+    "aws_vpc": {
+      "service": "ec2",
+      "taggable": true,
+      "required_iam_actions": [
+        "ec2:CreateVpc",
+        "ec2:DeleteVpc",
+        "ec2:ModifyVpcAttribute",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeVpcAttribute",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "VPC itself is free. ec2:DescribeAccountAttributes may be needed on first provider init."
+    },
+
+    "aws_subnet": {
+      "service": "ec2",
+      "taggable": true,
+      "required_iam_actions": [
+        "ec2:CreateSubnet",
+        "ec2:DeleteSubnet",
+        "ec2:ModifySubnetAttribute",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "ec2:DescribeAvailabilityZones required to validate AZ names during create."
+    },
+
+    "aws_route_table": {
+      "service": "ec2",
+      "taggable": true,
+      "required_iam_actions": [
+        "ec2:CreateRouteTable",
+        "ec2:DeleteRouteTable",
+        "ec2:CreateRoute",
+        "ec2:DeleteRoute",
+        "ec2:ReplaceRoute",
+        "ec2:DescribeRouteTables",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Route table and its routes are free."
+    },
+
+    "aws_route_table_association": {
+      "service": "ec2",
+      "taggable": false,
+      "required_iam_actions": [
+        "ec2:AssociateRouteTable",
+        "ec2:DisassociateRouteTable",
+        "ec2:ReplaceRouteTableAssociation",
+        "ec2:DescribeRouteTables"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Association resource — not independently taggable."
+    },
+
+    "aws_internet_gateway": {
+      "service": "ec2",
+      "taggable": true,
+      "required_iam_actions": [
+        "ec2:CreateInternetGateway",
+        "ec2:DeleteInternetGateway",
+        "ec2:AttachInternetGateway",
+        "ec2:DetachInternetGateway",
+        "ec2:DescribeInternetGateways",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "IGW itself is free. Data transfer through it incurs standard EC2 data transfer fees."
+    },
+
+    "aws_security_group": {
+      "service": "ec2",
+      "taggable": true,
+      "required_iam_actions": [
+        "ec2:CreateSecurityGroup",
+        "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:UpdateSecurityGroupRuleDescriptionsIngress",
+        "ec2:UpdateSecurityGroupRuleDescriptionsEgress",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSecurityGroupRules",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "ec2:DescribeNetworkInterfaces required to verify SG is unused before delete."
+    },
+
+    "aws_s3_bucket": {
+      "service": "s3",
+      "taggable": true,
+      "required_iam_actions": [
+        "s3:CreateBucket",
+        "s3:DeleteBucket",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetBucketTagging",
+        "s3:PutBucketTagging",
+        "s3:DeleteBucketTagging",
+        "s3:GetBucketObjectLockConfiguration",
+        "s3:GetLifecycleConfiguration",
+        "s3:PutLifecycleConfiguration",
+        "s3:GetBucketCors",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketAcl",
+        "s3:GetBucketLogging",
+        "s3:GetBucketRequestPayment",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketPublicAccessBlock"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "S3 read actions are required for Terraform refresh even when the resource has not changed."
+    },
+
+    "aws_s3_bucket_policy": {
+      "service": "s3",
+      "taggable": false,
+      "required_iam_actions": [
+        "s3:GetBucketPolicy",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Sub-resource of aws_s3_bucket — not independently taggable."
+    },
+
+    "aws_s3_bucket_public_access_block": {
+      "service": "s3",
+      "taggable": false,
+      "required_iam_actions": [
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutBucketPublicAccessBlock"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Sub-resource of aws_s3_bucket — not independently taggable."
+    },
+
+    "aws_s3_bucket_server_side_encryption_configuration": {
+      "service": "s3",
+      "taggable": false,
+      "required_iam_actions": [
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Sub-resource of aws_s3_bucket — not independently taggable."
+    },
+
+    "aws_s3_bucket_versioning": {
+      "service": "s3",
+      "taggable": false,
+      "required_iam_actions": [
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Sub-resource of aws_s3_bucket — not independently taggable."
+    },
+
+    "aws_cloudfront_origin_access_control": {
+      "service": "cloudfront",
+      "taggable": true,
+      "required_iam_actions": [
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:ListOriginAccessControls"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "OAC is free. Required before creating a distribution that uses it."
+    },
+
+    "aws_cloudfront_distribution": {
+      "service": "cloudfront",
+      "taggable": true,
+      "required_iam_actions": [
+        "cloudfront:CreateDistribution",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:ListDistributions",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Distribution propagation takes 5-10 minutes. PriceClass_100 (US/EU/CA) is the lowest-cost option."
+    },
+
+    "aws_db_subnet_group": {
+      "service": "rds",
+      "taggable": true,
+      "required_iam_actions": [
+        "rds:CreateDBSubnetGroup",
+        "rds:DescribeDBSubnetGroups",
+        "rds:ModifyDBSubnetGroup",
+        "rds:DeleteDBSubnetGroup",
+        "rds:AddTagsToResource",
+        "rds:RemoveTagsFromResource",
+        "rds:ListTagsForResource"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "Subnet group itself is free. Requires subnets in at least two AZs even for single-AZ deployments."
+    },
+
+    "aws_db_instance": {
+      "service": "rds",
+      "taggable": true,
+      "required_iam_actions": [
+        "rds:CreateDBInstance",
+        "rds:DescribeDBInstances",
+        "rds:ModifyDBInstance",
+        "rds:DeleteDBInstance",
+        "rds:AddTagsToResource",
+        "rds:RemoveTagsFromResource",
+        "rds:ListTagsForResource",
+        "rds:DescribeDBInstanceAutomatedBackups"
+      ],
+      "service_linked_roles": [
+        {
+          "action": "iam:CreateServiceLinkedRole",
+          "resource": "arn:aws:iam::*:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS",
+          "condition": {
+            "StringEquals": {
+              "iam:AWSServiceName": "rds.amazonaws.com"
+            }
+          },
+          "trigger": "First RDS deployment in an account where AWSServiceRoleForRDS does not yet exist. Subsequent runs skip this call silently.",
+          "source": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAM.ServiceLinkedRole.html",
+          "incident_note": "Order 624b06c6 failed 2026-05 without this permission. Fixed in cloudformation/tier1-bootstrap.yaml v2."
+        }
+      ],
+      "high_cost_risk": true,
+      "notes": "Cost depends on instance_class and multi_az. Prototype stack uses db.t3.micro single-AZ only. AmazonRDSFullAccess managed policy does NOT include iam:CreateServiceLinkedRole — must be added via inline supplemental policy."
+    },
+
+    "aws_cloudwatch_metric_alarm": {
+      "service": "cloudwatch",
+      "taggable": true,
+      "required_iam_actions": [
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource",
+        "cloudwatch:ListTagsForResource"
+      ],
+      "service_linked_roles": [],
+      "high_cost_risk": false,
+      "notes": "$0.10/alarm/month. Five alarms in the Tier 1 stack = ~$0.50/month."
+    }
+  }
+}

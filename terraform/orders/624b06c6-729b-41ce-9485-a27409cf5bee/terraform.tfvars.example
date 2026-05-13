@@ -1,0 +1,18 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# Never commit terraform.tfvars to source control (it is gitignored by default).
+
+# Required — must be set before running terraform apply
+db_password = "REPLACE_WITH_A_STRONG_PASSWORD_MIN_16_CHARS"
+
+# Optional — uncomment and set to enable ACM + Route53 + custom domain on CloudFront.
+# A Route53 hosted zone for this domain must already exist in your AWS account.
+# domain_name = "example.com"
+
+# Optional overrides — defaults are pre-configured for this order
+# order_id            = "624b06c6-729b-41ce-9485-a27409cf5bee"
+# customer_account_id = "823714877103"
+# region              = "us-east-1"
+# project_name        = "aspenx-tier1"
+# db_username         = "aspenxadmin"
+# db_instance_class   = "db.t3.micro"
+# db_allocated_storage = 20

@@ -1,0 +1,134 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AspenX Tier 1 Bootstrap — Creates AspenXDeployRole-<ORDER_SUFFIX>, a cross-account
+  IAM role that lets AspenX deploy your chosen architecture into this AWS account.
+  Do not modify this stack manually. To revoke all AspenX access, delete this stack.
+
+# ─── Changelog ────────────────────────────────────────────────────────────────
+# v3 (2026-05-11): Added OrderSuffix parameter. RoleName is now
+#   AspenXDeployRole-<ORDER_SUFFIX> (e.g. AspenXDeployRole-624B06C6) so that
+#   multiple orders in the same account do not collide on the role name.
+#   ORDER_SUFFIX = first 8 chars of OrderId (no dashes), uppercased.
+#   Export name updated to AspenXDeployRoleArn-<ORDER_SUFFIX> accordingly.
+# v2 (2026-05-06): Added iam:CreateServiceLinkedRole for rds.amazonaws.com.
+#   AmazonRDSFullAccess does not include this permission. Without it, RDS instance
+#   creation fails on first deploy when the AWSServiceRoleForRDS SLR does not yet
+#   exist in the account. Scoped to the RDS SLR resource ARN + AWSServiceName condition.
+# v1 (initial): Base role with AWS managed policies for VPC/S3/CF/RDS/CW/ACM/R53.
+
+Parameters:
+  AspenXPrincipalAccountId:
+    Type: String
+    Description: >
+      AspenX AWS account ID. The AspenX deployment pipeline assumes this role
+      from this account. Pre-filled by AspenX — do not change.
+    AllowedPattern: '[0-9]{12}'
+    ConstraintDescription: Must be a 12-digit AWS account ID.
+
+  ExternalId:
+    Type: String
+    Description: >
+      Per-order unique secret required when assuming the role.
+      Guards against confused-deputy attacks. Pre-filled by AspenX — do not change.
+    NoEcho: true
+    MinLength: 16
+
+  OrderId:
+    Type: String
+    Description: AspenX order ID. Used for resource tagging only.
+    AllowedPattern: '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
+  OrderSuffix:
+    Type: String
+    Description: >
+      First 8 characters of OrderId with dashes removed, uppercased.
+      Pre-filled by AspenX — do not change.
+      Derivation: strip dashes from OrderId, take first 8 chars, uppercase.
+      Example: OrderId 624b06c6-729b-41ce-... → OrderSuffix 624B06C6
+    AllowedPattern: '[0-9A-F]{8}'
+    ConstraintDescription: Must be exactly 8 uppercase hexadecimal characters.
+
+Resources:
+  AspenXDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'AspenXDeployRole-${OrderSuffix}'
+      Description: >
+        Cross-account role assumed by AspenX to deploy Tier 1 infrastructure
+        on behalf of the customer. Created by AspenX bootstrap CloudFormation stack.
+      MaxSessionDuration: 7200  # 2 hours — enough for a full Terraform apply
+
+      # ── Trust policy ──────────────────────────────────────────────────────────
+      # Only AspenX's principal account may assume this role, and only when the
+      # correct per-order ExternalId is supplied (prevents confused-deputy attacks).
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAspenXAssumption
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AspenXPrincipalAccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+
+      # ── AWS managed policies ──────────────────────────────────────────────────
+      # These cover the core services deployed by the Tier 1 Terraform package.
+      # Note: AmazonRDSFullAccess does NOT include iam:CreateServiceLinkedRole —
+      # that permission is added explicitly in the inline policy below (v2 fix).
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonVPCFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudFrontFullAccess
+        - arn:aws:iam::aws:policy/AmazonRDSFullAccess
+        - arn:aws:iam::aws:policy/CloudWatchFullAccess
+        - arn:aws:iam::aws:policy/AWSCertificateManagerFullAccess
+        - arn:aws:iam::aws:policy/AmazonRoute53FullAccess
+
+      # ── Inline supplemental policy ────────────────────────────────────────────
+      # Grants only the narrow IAM permissions that AWS managed policies omit but
+      # that the Terraform deployment requires. Each statement is independently
+      # scoped — no wildcards on the Action or an overly broad Resource.
+      Policies:
+        - PolicyName: AspenXSupplementalPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # RDS first-deploy fix (v2): RDS cannot create its service-linked role
+              # (AWSServiceRoleForRDS) unless the caller has this permission.
+              # The SLR is created once per account; subsequent deploys skip this.
+              # Resource is locked to the exact RDS SLR path; Condition double-gates
+              # via iam:AWSServiceName so the grant cannot be misused for other SLRs.
+              - Sid: AllowRDSServiceLinkedRoleCreation
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: 'arn:aws:iam::*:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS'
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName: rds.amazonaws.com
+
+      Tags:
+        - Key: ManagedBy
+          Value: AspenX
+        - Key: Project
+          Value: AspenX
+        - Key: AspenXTier
+          Value: Tier1
+        - Key: OrderId
+          Value: !Ref OrderId
+        - Key: CreatedBy
+          Value: AspenX
+
+Outputs:
+  RoleArn:
+    Description: >
+      ARN of the deployed role (e.g. arn:aws:iam::<account>:role/AspenXDeployRole-624B06C6).
+      Returned automatically to AspenX during bootstrap verification — no manual action required.
+    Value: !GetAtt AspenXDeployRole.Arn
+    Export:
+      Name: !Sub 'AspenXDeployRoleArn-${OrderSuffix}'
+
+  RoleName:
+    Description: Name of the deployed IAM role (e.g. AspenXDeployRole-624B06C6).
+    Value: !Ref AspenXDeployRole
